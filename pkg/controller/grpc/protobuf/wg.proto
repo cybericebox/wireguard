@@ -1,0 +1,26 @@
+syntax = "proto3";
+package wireguard;
+option go_package = "github.com/cybericebox/wireguard/pkg/controller/grpc/protobuf";
+
+service Wireguard {
+  rpc GetClientConfig(ClientConfigRequest) returns (ConfigResponse) {}
+  rpc DeleteClient(ClientRequest) returns (EmptyResponse) {}
+
+  rpc BanClient(ClientRequest) returns (EmptyResponse) {}
+  rpc UnBanClient(ClientRequest) returns (EmptyResponse) {}
+}
+
+message EmptyResponse {}
+
+message ClientConfigRequest {
+  string id = 1;
+  string destCIDR = 2;
+}
+
+message ClientRequest {
+  string id = 1;
+}
+
+message ConfigResponse {
+  string config = 1;
+}
