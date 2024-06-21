@@ -14,7 +14,7 @@ const (
 
 type (
 	Config struct {
-		Debug      bool             `yaml:"debug" env:"WG_DEBUG" env-default:"false" env-description:"Endpoint of GRPC server"`
+		Debug      bool             `yaml:"debug" env:"WG_DEBUG" env-default:"false" env-description:"Debug mode"`
 		Controller ControllerConfig `yaml:"controller"`
 		Service    ServiceConfig    `yaml:"service"`
 		Repository RepositoryConfig `yaml:"repository"`
@@ -25,7 +25,7 @@ type (
 	}
 
 	GRPCConfig struct {
-		Endpoint string     `yaml:"endpoint" env:"WG_GRPC_ENDPOINT" env-default:"0.0.0.0:5454" env-description:"Endpoint of GRPC server"`
+		Endpoint string     `yaml:"endpoint" env:"WG_GRPC_ENDPOINT_LOCAL" env-default:"0.0.0.0:5454" env-description:"Endpoint of GRPC server"`
 		Auth     AuthConfig `yaml:"auth"`
 		TLS      TLSConfig  `yaml:"tls"`
 	}
@@ -71,7 +71,7 @@ type (
 )
 
 func GetConfig() *Config {
-	path := flag.String("configs", "", "Path to config file")
+	path := flag.String("config", "", "Path to config file")
 
 	log.Info().Msg("Reading wireguard configuration")
 
