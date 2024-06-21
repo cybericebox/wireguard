@@ -80,6 +80,17 @@ func (m *IPAManager) AcquireChildCIDR(ctx context.Context, blockSize uint32) (*I
 	}, nil
 }
 
+func (m *IPAManager) GetChildCIDR(ctx context.Context, cidr string) (*IPAManager, error) {
+	prefix, err := m.ipaManager.PrefixFrom(ctx, cidr)
+	if err != nil {
+		return nil, err
+	}
+	return &IPAManager{
+		ipaManager: m.ipaManager,
+		cidr:       prefix.Cidr,
+	}, nil
+}
+
 func (m *IPAManager) ReleaseChildCIDR(ctx context.Context, childCIDR string) error {
 	// release all IPs in the CIDR
 	prefix, err := m.ipaManager.PrefixFrom(ctx, childCIDR)
@@ -137,6 +148,10 @@ func (m *IPAManager) ReleaseSingleIP(ctx context.Context, ip string) error {
 
 func (m *IPAManager) GetFirstIP() (string, error) {
 	return GetFirstCIDRIP(m.cidr)
+}
+
+func (m *IPAManager) GetCIDR() string {
+	return m.cidr
 }
 
 func GetFirstCIDRIP(cidr string) (string, error) {
