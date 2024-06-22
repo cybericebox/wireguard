@@ -25,7 +25,7 @@ type (
 	}
 
 	GRPCConfig struct {
-		Endpoint string     `yaml:"endpoint" env:"WG_GRPC_ENDPOINT_LOCAL" env-default:"0.0.0.0:5454" env-description:"Endpoint of GRPC server"`
+		Endpoint string     `yaml:"endpoint" env:"WG_GRPC_LISTEN_ENDPOINT" env-default:"0.0.0.0:5454" env-description:"Listen endpoint of GRPC server"`
 		Auth     AuthConfig `yaml:"auth"`
 		TLS      TLSConfig  `yaml:"tls"`
 	}
@@ -38,8 +38,8 @@ type (
 	}
 
 	AuthConfig struct {
-		AuthKey string `yaml:"authKey" env:"WG_GRPC_AUTH" env-description:"Auth key of GRPC server"`
-		SignKey string `yaml:"signKey" env:"WG_GRPC_SIGN" env-description:"Sign key of GRPC server"`
+		AuthKey string `yaml:"authKey" env:"WG_GRPC_AUTH_KEY" env-description:"Auth key of GRPC server"`
+		SignKey string `yaml:"signKey" env:"WG_GRPC_SIGN_KEY" env-description:"Sign key of GRPC server"`
 	}
 
 	ServiceConfig struct {
@@ -51,12 +51,12 @@ type (
 	}
 
 	VPNConfig struct {
-		Endpoint   string `yaml:"endpoint" env:"VPN_ENDPOINT" env-default:"" env-description:"VPN endpoint"`
-		CIDR       string `yaml:"cidr" env:"VPN_CIDR" env-default:"10.128.0.0/16" env-description:"VPN CIDR"`
+		Endpoint   string `yaml:"endpoint" env:"VPN_ENDPOINT" env-default:"" env-description:"VPN server endpoint"`
+		CIDR       string `yaml:"cidr" env:"VPN_CIDR" env-default:"10.128.0.0/16" env-description:"VPN clients CIDR"`
 		Address    string
-		Port       string `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN port"`
-		PrivateKey string `yaml:"privateKey" env:"VPN_PRIVATE_KEY" env-description:"VPN private key"`
-		PublicKey  string `yaml:"publicKey" env:"VPN_PUBLIC_KEY" env-description:"VPN public key"`
+		Port       string `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN server listen port"`
+		PrivateKey string
+		PublicKey  string
 	}
 
 	// PostgresConfig is the configuration for the Postgres database
@@ -66,7 +66,7 @@ type (
 		Username string `yaml:"username" env:"POSTGRES_USER" env-description:"Username of Postgres"`
 		Password string `yaml:"password" env:"POSTGRES_PASSWORD" env-description:"Password of Postgres"`
 		Database string `yaml:"database" env:"POSTGRES_DB" env-description:"Database of Postgres"`
-		SSLMode  string `yaml:"sslMode" env:"POSTGRES_SSL_MODE" env-default:"verify-full" env-description:"SSL mode of Postgres"`
+		SSLMode  string `yaml:"sslMode" env:"POSTGRES_SSL_MODE" env-default:"require" env-description:"SSL mode of Postgres"`
 	}
 )
 
