@@ -33,6 +33,18 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVPNClientsStmt, err = db.PrepareContext(ctx, getVPNClients); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVPNClients: %w", err)
 	}
+	if q.getVPNPrivateKeyStmt, err = db.PrepareContext(ctx, getVPNPrivateKey); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVPNPrivateKey: %w", err)
+	}
+	if q.getVPNPublicKeyStmt, err = db.PrepareContext(ctx, getVPNPublicKey); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVPNPublicKey: %w", err)
+	}
+	if q.setVPNPrivateKeyStmt, err = db.PrepareContext(ctx, setVPNPrivateKey); err != nil {
+		return nil, fmt.Errorf("error preparing query SetVPNPrivateKey: %w", err)
+	}
+	if q.setVPNPublicKeyStmt, err = db.PrepareContext(ctx, setVPNPublicKey); err != nil {
+		return nil, fmt.Errorf("error preparing query SetVPNPublicKey: %w", err)
+	}
 	if q.updateVPNClientBanStatusStmt, err = db.PrepareContext(ctx, updateVPNClientBanStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateVPNClientBanStatus: %w", err)
 	}
@@ -54,6 +66,26 @@ func (q *Queries) Close() error {
 	if q.getVPNClientsStmt != nil {
 		if cerr := q.getVPNClientsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVPNClientsStmt: %w", cerr)
+		}
+	}
+	if q.getVPNPrivateKeyStmt != nil {
+		if cerr := q.getVPNPrivateKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVPNPrivateKeyStmt: %w", cerr)
+		}
+	}
+	if q.getVPNPublicKeyStmt != nil {
+		if cerr := q.getVPNPublicKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVPNPublicKeyStmt: %w", cerr)
+		}
+	}
+	if q.setVPNPrivateKeyStmt != nil {
+		if cerr := q.setVPNPrivateKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setVPNPrivateKeyStmt: %w", cerr)
+		}
+	}
+	if q.setVPNPublicKeyStmt != nil {
+		if cerr := q.setVPNPublicKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setVPNPublicKeyStmt: %w", cerr)
 		}
 	}
 	if q.updateVPNClientBanStatusStmt != nil {
@@ -103,6 +135,10 @@ type Queries struct {
 	createVpnClientStmt          *sql.Stmt
 	deleteVPNClientStmt          *sql.Stmt
 	getVPNClientsStmt            *sql.Stmt
+	getVPNPrivateKeyStmt         *sql.Stmt
+	getVPNPublicKeyStmt          *sql.Stmt
+	setVPNPrivateKeyStmt         *sql.Stmt
+	setVPNPublicKeyStmt          *sql.Stmt
 	updateVPNClientBanStatusStmt *sql.Stmt
 }
 
@@ -113,6 +149,10 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createVpnClientStmt:          q.createVpnClientStmt,
 		deleteVPNClientStmt:          q.deleteVPNClientStmt,
 		getVPNClientsStmt:            q.getVPNClientsStmt,
+		getVPNPrivateKeyStmt:         q.getVPNPrivateKeyStmt,
+		getVPNPublicKeyStmt:          q.getVPNPublicKeyStmt,
+		setVPNPrivateKeyStmt:         q.setVPNPrivateKeyStmt,
+		setVPNPublicKeyStmt:          q.setVPNPublicKeyStmt,
 		updateVPNClientBanStatusStmt: q.updateVPNClientBanStatusStmt,
 	}
 }

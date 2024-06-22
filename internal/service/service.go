@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/cybericebox/wireguard/internal/config"
 	"github.com/cybericebox/wireguard/internal/delivery/repository/postgres"
@@ -33,6 +35,11 @@ type (
 		DeleteVPNClient(ctx context.Context, id uuid.UUID) error
 		GetVPNClients(ctx context.Context) ([]postgres.VpnClient, error)
 		UpdateVPNClientBanStatus(ctx context.Context, arg postgres.UpdateVPNClientBanStatusParams) error
+
+		GetVPNPrivateKey(ctx context.Context) (string, error)
+		GetVPNPublicKey(ctx context.Context) (string, error)
+		SetVPNPrivateKey(ctx context.Context, value string) error
+		SetVPNPublicKey(ctx context.Context, value string) error
 	}
 
 	IPAManager interface {
@@ -275,6 +282,38 @@ func (s *Service) InitServer(ctx context.Context) error {
 	// reserve server address
 	if _, err = s.ipaManager.AcquireSingleIP(ctx, s.config.Address); err != nil {
 		return fmt.Errorf("acquiring server ip error: [%w]", err)
+	}
+
+	// get server private key
+	s.config.PrivateKey, err = s.repository.GetVPNPrivateKey(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("getting server private key error: [%w]", err)
+	}
+
+	// get server public key
+	s.config.PublicKey, err = s.repository.GetVPNPublicKey(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("getting server public key error: [%w]", err)
+	}
+
+	// if server private key does not exist generate new key pair
+	if s.config.PrivateKey == "" || s.config.PublicKey == "" {
+		// generate server key pair
+		keys, err := s.keyGenerator.NewKeyPair()
+		if err != nil {
+			return fmt.Errorf("generating server key pair error: [%w]", err)
+		}
+
+		s.config.PrivateKey, s.config.PublicKey = keys.PrivateKey, keys.PublicKey
+
+		// save server key pair
+		if err = s.repository.SetVPNPrivateKey(ctx, s.config.PrivateKey); err != nil {
+			return fmt.Errorf("saving server private key error: [%w]", err)
+		}
+
+		if err = s.repository.SetVPNPublicKey(ctx, s.config.PublicKey); err != nil {
+			return fmt.Errorf("saving server public key error: [%w]", err)
+		}
 	}
 
 	strConfig, err := s.generateServerConfig()
