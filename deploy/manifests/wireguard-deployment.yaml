@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wireguard
+  namespace: cybericebox
+  labels:
+    app: wireguard
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: wireguard
+  template:
+    metadata:
+      name: wireguard
+      namespace: cybericebox
+      labels:
+        app: wireguard
+    spec:
+      containers:
+        - name: wireguard
+          image: cybericebox/wireguard:latest
+          envFrom:
+            - configMapRef:
+              name: config
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_MODULE
+            privileged: true
+          volumeMounts:
+            - name: host-volumes
+              mountPath: /lib/modules
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5454
+              protocol: TCP
+              name: grpc
+            - containerPort: 51820
+              protocol: UDP
+              name: vpn
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /ready
+            initialDelaySeconds: 2
+            periodSeconds: 20
+            successThreshold: 1
+      volumes:
+        - name: host-volumes
+          hostPath:
+            path: /lib/modules
+            type: Directory
