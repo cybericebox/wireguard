@@ -72,6 +72,7 @@ type (
 
 func GetConfig() *Config {
 	path := flag.String("config", "", "Path to config file")
+	flag.Parse()
 
 	log.Info().Msg("Reading wireguard configuration")
 

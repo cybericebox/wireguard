@@ -27,7 +27,7 @@ spec:
           image: cybericebox/wireguard:latest
           envFrom:
             - configMapRef:
-              name: config
+                name: config
           securityContext:
             capabilities:
               add:
