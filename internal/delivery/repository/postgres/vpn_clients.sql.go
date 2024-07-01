@@ -8,7 +8,6 @@ package postgres
 import (
 	"context"
 
-	"github.com/gofrs/uuid"
 	"github.com/sqlc-dev/pqtype"
 )
 
@@ -18,7 +17,7 @@ values ($1, $2, $3, $4, $5)
 `
 
 type CreateVpnClientParams struct {
-	ID             uuid.UUID   `json:"id"`
+	ID             string      `json:"id"`
 	IpAddress      pqtype.Inet `json:"ip_address"`
 	PublicKey      string      `json:"public_key"`
 	PrivateKey     string      `json:"private_key"`
@@ -42,7 +41,7 @@ from vpn_clients
 where id = $1
 `
 
-func (q *Queries) DeleteVPNClient(ctx context.Context, id uuid.UUID) error {
+func (q *Queries) DeleteVPNClient(ctx context.Context, id string) error {
 	_, err := q.exec(ctx, q.deleteVPNClientStmt, deleteVPNClient, id)
 	return err
 }
@@ -98,8 +97,8 @@ where id = $1
 `
 
 type UpdateVPNClientBanStatusParams struct {
-	ID     uuid.UUID `json:"id"`
-	Banned bool      `json:"banned"`
+	ID     string `json:"id"`
+	Banned bool   `json:"banned"`
 }
 
 func (q *Queries) UpdateVPNClientBanStatus(ctx context.Context, arg UpdateVPNClientBanStatusParams) error {

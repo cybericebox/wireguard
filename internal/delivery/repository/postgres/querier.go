@@ -6,13 +6,11 @@ package postgres
 
 import (
 	"context"
-
-	"github.com/gofrs/uuid"
 )
 
 type Querier interface {
 	CreateVpnClient(ctx context.Context, arg CreateVpnClientParams) error
-	DeleteVPNClient(ctx context.Context, id uuid.UUID) error
+	DeleteVPNClient(ctx context.Context, id string) error
 	GetVPNClients(ctx context.Context) ([]VpnClient, error)
 	GetVPNPrivateKey(ctx context.Context) (string, error)
 	GetVPNPublicKey(ctx context.Context) (string, error)

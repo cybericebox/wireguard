@@ -24,7 +24,9 @@ PrivateKey = {{.PrivateKey}}
 SaveConfig = true
 
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT;
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT;`
+PostUp = sysctl -w -q net.ipv4.ip_forward=1;
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT;
+PostDown = sysctl -w -q net.ipv4.ip_forward=0;`
 	clientConfigTemplate = `[Interface]
 PrivateKey = {{.PrivateKey}}
 Address = {{.Address}}
