@@ -1,6 +1,6 @@
 create table if not exists vpn_clients
 (
-    id              uuid primary key,
+    id varchar(74) primary key,
 
     ip_address      inet        not null unique,
     public_key      varchar(44) not null unique,
