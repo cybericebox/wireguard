@@ -8,12 +8,11 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/sqlc-dev/pqtype"
 )
 
 type VpnClient struct {
-	ID             uuid.UUID    `json:"id"`
+	ID             string       `json:"id"`
 	IpAddress      pqtype.Inet  `json:"ip_address"`
 	PublicKey      string       `json:"public_key"`
 	PrivateKey     string       `json:"private_key"`

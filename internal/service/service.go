@@ -10,7 +10,6 @@ import (
 	"github.com/cybericebox/wireguard/internal/model"
 	"github.com/cybericebox/wireguard/pkg/ipam"
 	wg_key_gen "github.com/cybericebox/wireguard/pkg/wg-key-gen"
-	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog/log"
 	"github.com/sqlc-dev/pqtype"
@@ -32,7 +31,7 @@ type (
 
 	Repository interface {
 		CreateVpnClient(ctx context.Context, arg postgres.CreateVpnClientParams) error
-		DeleteVPNClient(ctx context.Context, id uuid.UUID) error
+		DeleteVPNClient(ctx context.Context, id string) error
 		GetVPNClients(ctx context.Context) ([]postgres.VpnClient, error)
 		UpdateVPNClientBanStatus(ctx context.Context, arg postgres.UpdateVPNClientBanStatusParams) error
 
@@ -93,11 +92,6 @@ func (s *Service) DeleteClient(ctx context.Context, clientID string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	parsedID, err := uuid.FromString(clientID)
-	if err != nil {
-		return fmt.Errorf("parsing client id error: [%w]", err)
-	}
-
 	client, ex := s.clients[clientID]
 	if !ex {
 		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
@@ -105,18 +99,18 @@ func (s *Service) DeleteClient(ctx context.Context, clientID string) error {
 
 	// delete user
 	// delete user peer
-	if err = s.deletePeer(client.Address, client.PublicKey); err != nil {
+	if err := s.deletePeer(client.Address, client.PublicKey); err != nil {
 		return fmt.Errorf("deleting client peer error: [%w]", err)
 	}
 
 	// delete nat rule
-	if err = s.deleteNATRule(client.ID, client.Address, client.AllowedIPs); err != nil {
+	if err := s.deleteNATRule(client.ID, client.Address, client.AllowedIPs); err != nil {
 		return fmt.Errorf("deleting client NAT rule error: [%w]", err)
 	}
 
 	// delete ban rule if user is banned
 	if client.Banned {
-		if err = s.deleteBlockRule(client.ID, client.Address); err != nil {
+		if err := s.deleteBlockRule(client.ID, client.Address); err != nil {
 			return fmt.Errorf("deleting client blocking rule error: [%w]", err)
 		}
 	}
@@ -125,12 +119,12 @@ func (s *Service) DeleteClient(ctx context.Context, clientID string) error {
 	addr, _ := strings.CutSuffix(client.Address, "/32")
 
 	// release user address
-	if err = s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
+	if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
 		return fmt.Errorf("realising client ip error: [%w]", err)
 	}
 
 	// delete user from db
-	if err = s.repository.DeleteVPNClient(ctx, parsedID); err != nil {
+	if err := s.repository.DeleteVPNClient(ctx, clientID); err != nil {
 		return fmt.Errorf("deleting client from db error: [%w]", err)
 	}
 
@@ -143,22 +137,17 @@ func (s *Service) BanClient(ctx context.Context, clientID string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	parsedID, err := uuid.FromString(clientID)
-	if err != nil {
-		return fmt.Errorf("parsing client id error: [%w]", err)
-	}
-
 	if _, ex := s.clients[clientID]; !ex {
 		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
 	}
 
 	// ban user
-	if err = s.addBlockRule(clientID, s.clients[clientID].Address); err != nil {
+	if err := s.addBlockRule(clientID, s.clients[clientID].Address); err != nil {
 		return fmt.Errorf("adding client blocking rule error: [%w]", err)
 	}
 
-	if err = s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
-		ID:     parsedID,
+	if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
+		ID:     clientID,
 		Banned: true,
 	}); err != nil {
 		return fmt.Errorf("adding client blocking to db error: [%w]", err)
@@ -174,22 +163,17 @@ func (s *Service) UnBanClient(ctx context.Context, clientID string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	parsedID, err := uuid.FromString(clientID)
-	if err != nil {
-		return fmt.Errorf("parsing client id error: [%w]", err)
-	}
-
 	if _, ex := s.clients[clientID]; !ex {
 		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
 	}
 
 	// unban user
-	if err = s.deleteBlockRule(clientID, s.clients[clientID].Address); err != nil {
+	if err := s.deleteBlockRule(clientID, s.clients[clientID].Address); err != nil {
 		return fmt.Errorf("deleting client blocking rule error: [%w]", err)
 	}
 
-	if err = s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
-		ID:     parsedID,
+	if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
+		ID:     clientID,
 		Banned: false,
 	}); err != nil {
 		return fmt.Errorf("deleting client blocking from db error: [%w]", err)
@@ -201,11 +185,6 @@ func (s *Service) UnBanClient(ctx context.Context, clientID string) error {
 }
 
 func (s *Service) createClient(ctx context.Context, client *model.Client) (err error) {
-	parsedID, err := uuid.FromString(client.ID)
-	if err != nil {
-		return fmt.Errorf("parsing client id error: [%w]", err)
-	}
-
 	// generate client address
 	client.Address, err = s.ipaManager.AcquireSingleIP(ctx)
 	if err != nil {
@@ -241,7 +220,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 
 	// add client to db
 	if err = s.repository.CreateVpnClient(ctx, postgres.CreateVpnClientParams{
-		ID: parsedID,
+		ID: client.ID,
 		IpAddress: pqtype.Inet{
 			IPNet: *ip,
 			Valid: true,
@@ -347,7 +326,7 @@ func (s *Service) InitServerUsers(ctx context.Context) (errs error) {
 	// create users
 	for _, u := range users {
 		user := &model.Client{
-			ID:         u.ID.String(),
+			ID:         u.ID,
 			Address:    u.IpAddress.IPNet.String(),
 			PrivateKey: u.PrivateKey,
 			PublicKey:  u.PublicKey,
