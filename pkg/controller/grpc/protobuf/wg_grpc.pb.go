@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
+	Wireguard_Ping_FullMethodName            = "/wireguard.Wireguard/Ping"
 	Wireguard_GetClientConfig_FullMethodName = "/wireguard.Wireguard/GetClientConfig"
 	Wireguard_DeleteClient_FullMethodName    = "/wireguard.Wireguard/DeleteClient"
 	Wireguard_BanClient_FullMethodName       = "/wireguard.Wireguard/BanClient"
@@ -29,6 +30,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WireguardClient interface {
+	// metrics
+	Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	GetClientConfig(ctx context.Context, in *ClientConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
 	DeleteClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	BanClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
@@ -41,6 +44,16 @@ type wireguardClient struct {
 
 func NewWireguardClient(cc grpc.ClientConnInterface) WireguardClient {
 	return &wireguardClient{cc}
+}
+
+func (c *wireguardClient) Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EmptyResponse)
+	err := c.cc.Invoke(ctx, Wireguard_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *wireguardClient) GetClientConfig(ctx context.Context, in *ClientConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error) {
@@ -87,6 +100,8 @@ func (c *wireguardClient) UnBanClient(ctx context.Context, in *ClientRequest, op
 // All implementations must embed UnimplementedWireguardServer
 // for forward compatibility
 type WireguardServer interface {
+	// metrics
+	Ping(context.Context, *EmptyRequest) (*EmptyResponse, error)
 	GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error)
 	DeleteClient(context.Context, *ClientRequest) (*EmptyResponse, error)
 	BanClient(context.Context, *ClientRequest) (*EmptyResponse, error)
@@ -98,6 +113,9 @@ type WireguardServer interface {
 type UnimplementedWireguardServer struct {
 }
 
+func (UnimplementedWireguardServer) Ping(context.Context, *EmptyRequest) (*EmptyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (UnimplementedWireguardServer) GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClientConfig not implemented")
 }
@@ -121,6 +139,24 @@ type UnsafeWireguardServer interface {
 
 func RegisterWireguardServer(s grpc.ServiceRegistrar, srv WireguardServer) {
 	s.RegisterService(&Wireguard_ServiceDesc, srv)
+}
+
+func _Wireguard_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmptyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WireguardServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Wireguard_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WireguardServer).Ping(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Wireguard_GetClientConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -202,6 +238,10 @@ var Wireguard_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "wireguard.Wireguard",
 	HandlerType: (*WireguardServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Ping",
+			Handler:    _Wireguard_Ping_Handler,
+		},
 		{
 			MethodName: "GetClientConfig",
 			Handler:    _Wireguard_GetClientConfig_Handler,
