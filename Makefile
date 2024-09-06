@@ -9,3 +9,6 @@ buildAndPush:
 
 protoCompile:
 	docker run --rm -v ./pkg/controller/grpc/protobuf:/app -w /app --platform=linux/amd64 cybericebox/proto-compiler
+
+updatePackages:
+	go get -u ./...

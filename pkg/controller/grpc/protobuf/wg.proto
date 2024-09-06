@@ -3,12 +3,16 @@ package wireguard;
 option go_package = "github.com/cybericebox/wireguard/pkg/controller/grpc/protobuf";
 
 service Wireguard {
+  // metrics
+  rpc Ping(EmptyRequest) returns (EmptyResponse) {}
+
   rpc GetClientConfig(ClientConfigRequest) returns (ConfigResponse) {}
   rpc DeleteClient(ClientRequest) returns (EmptyResponse) {}
 
   rpc BanClient(ClientRequest) returns (EmptyResponse) {}
   rpc UnBanClient(ClientRequest) returns (EmptyResponse) {}
 }
+message EmptyRequest {}
 
 message EmptyResponse {}
 
