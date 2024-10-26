@@ -54,7 +54,7 @@ type (
 		Endpoint   string `yaml:"endpoint" env:"VPN_ENDPOINT" env-default:"" env-description:"VPN server endpoint"`
 		CIDR       string `yaml:"cidr" env:"VPN_CIDR" env-default:"10.128.0.0/16" env-description:"VPN clients CIDR"`
 		Address    string
-		Port       string `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN server listen port"`
+		Port       int `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN server listen port"`
 		PrivateKey string
 		PublicKey  string
 	}

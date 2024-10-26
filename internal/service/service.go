@@ -9,11 +9,11 @@ import (
 	"github.com/cybericebox/wireguard/internal/delivery/repository/postgres"
 	"github.com/cybericebox/wireguard/internal/model"
 	"github.com/cybericebox/wireguard/pkg/ipam"
-	wg_key_gen "github.com/cybericebox/wireguard/pkg/wg-key-gen"
+	"github.com/cybericebox/wireguard/pkg/wg-key-gen"
+	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog/log"
-	"github.com/sqlc-dev/pqtype"
-	"net"
+	"net/netip"
 	"path"
 	"strings"
 	"sync"
@@ -31,9 +31,14 @@ type (
 
 	Repository interface {
 		CreateVpnClient(ctx context.Context, arg postgres.CreateVpnClientParams) error
-		DeleteVPNClient(ctx context.Context, id string) error
 		GetVPNClients(ctx context.Context) ([]postgres.VpnClient, error)
 		UpdateVPNClientBanStatus(ctx context.Context, arg postgres.UpdateVPNClientBanStatusParams) error
+		UpdateVPNClientBannedStatusByGroupID(ctx context.Context, arg postgres.UpdateVPNClientBannedStatusByGroupIDParams) error
+		UpdateVPNClientBannedStatusByUserID(ctx context.Context, arg postgres.UpdateVPNClientBannedStatusByUserIDParams) error
+
+		DeleteVPNClient(ctx context.Context, arg postgres.DeleteVPNClientParams) error
+		DeleteVPNClientsByGroupID(ctx context.Context, groupID uuid.UUID) error
+		DeleteVPNClientsByUserID(ctx context.Context, userID uuid.UUID) error
 
 		GetVPNPrivateKey(ctx context.Context) (string, error)
 		GetVPNPublicKey(ctx context.Context) (string, error)
@@ -65,17 +70,22 @@ func NewService(deps Dependencies) *Service {
 	}
 }
 
-func (s *Service) GetClientConfig(ctx context.Context, clientID, destCIDR string) (string, error) {
+func getClientID(userID, groupID uuid.UUID) string {
+	return fmt.Sprintf("%s-%s", userID, groupID)
+}
+
+func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID, destCIDR string) (string, error) {
 	s.m.Lock()
 
 	// check if user exists
-	client, ex := s.clients[clientID]
+	client, ex := s.clients[getClientID(userID, groupID)]
 
 	s.m.Unlock()
 	// if user does not exist create new user
 	if !ex {
 		client = &model.Client{
-			ID:         clientID,
+			UserID:     userID,
+			GroupID:    groupID,
 			AllowedIPs: destCIDR,
 		}
 
@@ -88,100 +98,223 @@ func (s *Service) GetClientConfig(ctx context.Context, clientID, destCIDR string
 	return s.generateClientConfig(client)
 }
 
-func (s *Service) DeleteClient(ctx context.Context, clientID string) error {
-	s.m.Lock()
-	defer s.m.Unlock()
+func (s *Service) getFilteredClients(userID, groupID uuid.UUID) []*model.Client {
+	s.m.RLock()
+	defer s.m.RUnlock()
 
-	client, ex := s.clients[clientID]
-	if !ex {
-		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
-	}
-
-	// delete user
-	// delete user peer
-	if err := s.deletePeer(client.Address, client.PublicKey); err != nil {
-		return fmt.Errorf("deleting client peer error: [%w]", err)
-	}
-
-	// delete nat rule
-	if err := s.deleteNATRule(client.ID, client.Address, client.AllowedIPs); err != nil {
-		return fmt.Errorf("deleting client NAT rule error: [%w]", err)
-	}
-
-	// delete ban rule if user is banned
-	if client.Banned {
-		if err := s.deleteBlockRule(client.ID, client.Address); err != nil {
-			return fmt.Errorf("deleting client blocking rule error: [%w]", err)
+	clients := make([]*model.Client, 0, len(s.clients))
+	for id, c := range s.clients {
+		if userID != uuid.Nil && groupID != uuid.Nil {
+			if id == getClientID(userID, groupID) {
+				clients = append(clients, c)
+				break
+			}
+		} else if userID != uuid.Nil {
+			if c.UserID == userID {
+				clients = append(clients, c)
+			}
+		} else if groupID != uuid.Nil {
+			if c.GroupID == groupID {
+				clients = append(clients, c)
+			}
+		} else {
+			clients = append(clients, c)
 		}
 	}
 
-	// cut mask from address, because release function get only ip
-	addr, _ := strings.CutSuffix(client.Address, "/32")
+	return clients
+}
 
-	// release user address
-	if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
-		return fmt.Errorf("realising client ip error: [%w]", err)
+func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) error {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	var errs error
+
+	clients := s.getFilteredClients(userID, groupID)
+
+	if len(clients) == 0 {
+		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
 	}
 
-	// delete user from db
-	if err := s.repository.DeleteVPNClient(ctx, clientID); err != nil {
-		return fmt.Errorf("deleting client from db error: [%w]", err)
+	for _, c := range clients {
+		// delete user peer
+		if err := s.deletePeer(c.Address, c.PublicKey); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("deleting client peer error: [%w]", err))
+			continue
+		}
+
+		// delete nat rule
+		if err := s.deleteNATRule(getClientID(c.UserID, c.GroupID), c.Address, c.AllowedIPs); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("deleting client NAT rule error: [%w]", err))
+			continue
+		}
+
+		// delete ban rule if user is banned
+		if c.Banned {
+			if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
+				errs = multierror.Append(errs, fmt.Errorf("deleting client blocking rule error: [%w]", err))
+				continue
+			}
+		}
+
+		// cut mask from address, because release function get only ip
+		addr, _ := strings.CutSuffix(c.Address, "/32")
+
+		// release user address
+		if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("releasing client ip error: [%w]", err))
+			continue
+		}
+
+		delete(s.clients, getClientID(c.UserID, c.GroupID))
 	}
 
-	delete(s.clients, clientID)
+	if errs != nil {
+		return errs
+	}
+
+	if len(clients) == 1 {
+		if err := s.repository.DeleteVPNClient(ctx, postgres.DeleteVPNClientParams{
+			UserID:  userID,
+			GroupID: groupID,
+		}); err != nil {
+			return fmt.Errorf("deleting client from db error: [%w]", err)
+		}
+	} else {
+		if userID != uuid.Nil {
+			if err := s.repository.DeleteVPNClientsByUserID(ctx, userID); err != nil {
+				return fmt.Errorf("deleting clients from db error: [%w]", err)
+			}
+		}
+		if groupID != uuid.Nil {
+			if err := s.repository.DeleteVPNClientsByGroupID(ctx, groupID); err != nil {
+				return fmt.Errorf("deleting clients from db error: [%w]", err)
+			}
+		}
+	}
 
 	return nil
 }
 
-func (s *Service) BanClient(ctx context.Context, clientID string) error {
+func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if _, ex := s.clients[clientID]; !ex {
-		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
+	var errs error
+
+	clients := s.getFilteredClients(userID, groupID)
+
+	if len(clients) == 0 {
+		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
 	}
 
-	// ban user
-	if err := s.addBlockRule(clientID, s.clients[clientID].Address); err != nil {
-		return fmt.Errorf("adding client blocking rule error: [%w]", err)
+	for _, c := range clients {
+		// ban user
+		if err := s.addBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("adding client blocking rule error: [%w]", err))
+			continue
+		}
+
 	}
 
-	if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
-		ID:     clientID,
-		Banned: true,
-	}); err != nil {
-		return fmt.Errorf("adding client blocking to db error: [%w]", err)
+	if errs != nil {
+		return errs
 	}
 
-	s.clients[clientID].Banned = true
+	if len(clients) == 1 {
+		if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
+			UserID:  userID,
+			GroupID: groupID,
+			Banned:  true,
+		}); err != nil {
+			return fmt.Errorf("updating client ban status in db error: [%w]", err)
+		}
+	} else {
+		if userID != uuid.Nil {
+			if err := s.repository.UpdateVPNClientBannedStatusByUserID(ctx, postgres.UpdateVPNClientBannedStatusByUserIDParams{
+				UserID: userID,
+				Banned: true,
+			}); err != nil {
+				return fmt.Errorf("updating client ban status in db error: [%w]", err)
+			}
+		}
+		if groupID != uuid.Nil {
+			if err := s.repository.UpdateVPNClientBannedStatusByGroupID(ctx, postgres.UpdateVPNClientBannedStatusByGroupIDParams{
+				GroupID: groupID,
+				Banned:  true,
+			}); err != nil {
+				return fmt.Errorf("updating client ban status in db error: [%w]", err)
+			}
+		}
+	}
+
+	for _, c := range clients {
+		s.clients[getClientID(c.UserID, c.GroupID)].Banned = true
+	}
 
 	return nil
 
 }
 
-func (s *Service) UnBanClient(ctx context.Context, clientID string) error {
+func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if _, ex := s.clients[clientID]; !ex {
-		return fmt.Errorf("client with id [ %s ] does not exist", clientID)
+	var errs error
+
+	clients := s.getFilteredClients(userID, groupID)
+
+	if len(clients) == 0 {
+		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
 	}
 
-	// unban user
-	if err := s.deleteBlockRule(clientID, s.clients[clientID].Address); err != nil {
-		return fmt.Errorf("deleting client blocking rule error: [%w]", err)
+	for _, c := range clients {
+		// ban user
+		if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("deleting client blocking rule error: [%w]", err))
+			continue
+		}
+
 	}
 
-	if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
-		ID:     clientID,
-		Banned: false,
-	}); err != nil {
-		return fmt.Errorf("deleting client blocking from db error: [%w]", err)
+	if errs != nil {
+		return errs
 	}
 
-	s.clients[clientID].Banned = false
+	if len(clients) == 1 {
+		if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
+			UserID:  userID,
+			GroupID: groupID,
+			Banned:  false,
+		}); err != nil {
+			return fmt.Errorf("updating client ban status in db error: [%w]", err)
+		}
+	} else {
+		if userID != uuid.Nil {
+			if err := s.repository.UpdateVPNClientBannedStatusByUserID(ctx, postgres.UpdateVPNClientBannedStatusByUserIDParams{
+				UserID: userID,
+				Banned: false,
+			}); err != nil {
+				return fmt.Errorf("updating client ban status in db error: [%w]", err)
+			}
+		}
+		if groupID != uuid.Nil {
+			if err := s.repository.UpdateVPNClientBannedStatusByGroupID(ctx, postgres.UpdateVPNClientBannedStatusByGroupIDParams{
+				GroupID: groupID,
+				Banned:  false,
+			}); err != nil {
+				return fmt.Errorf("updating client ban status in db error: [%w]", err)
+			}
+		}
+	}
+
+	for _, c := range clients {
+		s.clients[getClientID(c.UserID, c.GroupID)].Banned = false
+	}
 
 	return nil
+
 }
 
 func (s *Service) createClient(ctx context.Context, client *model.Client) (err error) {
@@ -190,6 +323,10 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	if err != nil {
 		return fmt.Errorf("acquiring client ip error: [%w]", err)
 	}
+
+	// add 32 mask to address
+	client.Address = fmt.Sprintf("%s/32", client.Address)
+
 	// generate client key pair
 	keys, err := s.keyGenerator.NewKeyPair()
 	if err != nil {
@@ -204,33 +341,28 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	}
 
 	// add nat rule
-	if err = s.addNATRule(client.ID, client.Address, client.AllowedIPs); err != nil {
+	if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
 		return fmt.Errorf("adding client NAT rule error: [%w]", err)
 	}
 
-	_, ip, err := net.ParseCIDR(fmt.Sprintf("%s/32", client.Address))
+	ip, err := netip.ParsePrefix(client.Address)
 	if err != nil {
 		return fmt.Errorf("parsing client ip error: [%w]", err)
 	}
 
-	_, allowedIPs, err := net.ParseCIDR(client.AllowedIPs)
+	allowedIPs, err := netip.ParsePrefix(client.AllowedIPs)
 	if err != nil {
 		return fmt.Errorf("parsing client allowedIPs error: [%w]", err)
 	}
 
 	// add client to db
 	if err = s.repository.CreateVpnClient(ctx, postgres.CreateVpnClientParams{
-		ID: client.ID,
-		IpAddress: pqtype.Inet{
-			IPNet: *ip,
-			Valid: true,
-		},
-		PublicKey:  client.PublicKey,
-		PrivateKey: client.PrivateKey,
-		LaboratoryCidr: pqtype.Inet{
-			IPNet: *allowedIPs,
-			Valid: true,
-		},
+		UserID:         client.UserID,
+		GroupID:        client.GroupID,
+		IpAddress:      ip,
+		PublicKey:      client.PublicKey,
+		PrivateKey:     client.PrivateKey,
+		LaboratoryCidr: allowedIPs,
 	}); err != nil {
 		return fmt.Errorf("creating client in db error: [%w]", err)
 	}
@@ -245,7 +377,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	s.clients[client.ID] = client
+	s.clients[getClientID(client.UserID, client.GroupID)] = client
 
 	return nil
 }
@@ -309,7 +441,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 	}
 
 	log.Debug().Str("Address: ", s.config.Address).
-		Str("ListenPort: ", s.config.Port).Msgf("Interface %s created and it is up", nic)
+		Int("ListenPort: ", s.config.Port).Msgf("Interface %s created and it is up", nic)
 
 	return nil
 }
@@ -319,44 +451,47 @@ func (s *Service) InitServerUsers(ctx context.Context) (errs error) {
 	defer s.m.Unlock()
 
 	// get all users from db
-	users, err := s.repository.GetVPNClients(ctx)
+	clients, err := s.repository.GetVPNClients(ctx)
 	if err != nil {
 		return fmt.Errorf("getting clients from db error: [%w]", err)
 	}
 	// create users
-	for _, u := range users {
-		user := &model.Client{
-			ID:         u.ID,
-			Address:    u.IpAddress.IPNet.String(),
-			PrivateKey: u.PrivateKey,
-			PublicKey:  u.PublicKey,
-			AllowedIPs: u.LaboratoryCidr.IPNet.String(),
-			Banned:     u.Banned,
+	for _, c := range clients {
+		client := &model.Client{
+			UserID:     c.UserID,
+			GroupID:    c.GroupID,
+			Address:    c.IpAddress.String(),
+			DNS:        "",
+			PrivateKey: c.PrivateKey,
+			PublicKey:  c.PublicKey,
+			AllowedIPs: c.LaboratoryCidr.String(),
+			Endpoint:   "",
+			Banned:     c.Banned,
 		}
 		// generate user DNS address
-		user.DNS, err = ipam.GetFirstCIDRIP(user.AllowedIPs)
+		client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 		if err != nil {
 			return err
 
 		}
 
-		if err = s.addPeer(user.Address, user.PublicKey); err != nil {
-			errs = multierror.Append(fmt.Errorf("adding client peer error: [%w]", err))
+		if err = s.addPeer(client.Address, client.PublicKey); err != nil {
+			errs = multierror.Append(fmt.Errorf("adding c peer error: [%w]", err))
 		}
 
 		// add nat rule
-		if err = s.addNATRule(user.ID, user.Address, user.AllowedIPs); err != nil {
-			errs = multierror.Append(fmt.Errorf("adding client NAT rule error: [%w]", err))
+		if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
+			errs = multierror.Append(fmt.Errorf("adding c NAT rule error: [%w]", err))
 		}
 
 		// if user is banned add block rule
-		if user.Banned {
-			if err = s.addBlockRule(user.ID, user.Address); err != nil {
-				errs = multierror.Append(fmt.Errorf("adding client blocking rule error: [%w]", err))
+		if client.Banned {
+			if err = s.addBlockRule(getClientID(client.UserID, client.GroupID), client.Address); err != nil {
+				errs = multierror.Append(fmt.Errorf("adding c blocking rule error: [%w]", err))
 			}
 		}
 
-		s.clients[user.ID] = user
+		s.clients[getClientID(client.UserID, client.GroupID)] = client
 	}
 	return errs
 }

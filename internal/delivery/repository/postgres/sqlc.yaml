@@ -12,6 +12,7 @@ sql:
         emit_interface: true
         emit_empty_slices: true
         omit_unused_structs: true
+        sql_package: "pgx/v5"
         overrides:
           - db_type: "uuid"
             engine: "postgresql"

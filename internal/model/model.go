@@ -1,8 +1,11 @@
 package model
 
+import "github.com/gofrs/uuid"
+
 type (
 	Client struct {
-		ID         string
+		UserID     uuid.UUID
+		GroupID    uuid.UUID
 		Address    string
 		DNS        string
 		PrivateKey string

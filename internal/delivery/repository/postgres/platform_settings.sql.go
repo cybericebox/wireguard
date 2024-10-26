@@ -17,7 +17,7 @@ where type = 'vpn'
 `
 
 func (q *Queries) GetVPNPrivateKey(ctx context.Context) (string, error) {
-	row := q.queryRow(ctx, q.getVPNPrivateKeyStmt, getVPNPrivateKey)
+	row := q.db.QueryRow(ctx, getVPNPrivateKey)
 	var value string
 	err := row.Scan(&value)
 	return value, err
@@ -31,7 +31,7 @@ where type = 'vpn'
 `
 
 func (q *Queries) GetVPNPublicKey(ctx context.Context) (string, error) {
-	row := q.queryRow(ctx, q.getVPNPublicKeyStmt, getVPNPublicKey)
+	row := q.db.QueryRow(ctx, getVPNPublicKey)
 	var value string
 	err := row.Scan(&value)
 	return value, err
@@ -43,7 +43,7 @@ values ('vpn', 'private_key', $1)
 `
 
 func (q *Queries) SetVPNPrivateKey(ctx context.Context, value string) error {
-	_, err := q.exec(ctx, q.setVPNPrivateKeyStmt, setVPNPrivateKey, value)
+	_, err := q.db.Exec(ctx, setVPNPrivateKey, value)
 	return err
 }
 
@@ -53,6 +53,6 @@ values ('vpn', 'public_key', $1)
 `
 
 func (q *Queries) SetVPNPublicKey(ctx context.Context, value string) error {
-	_, err := q.exec(ctx, q.setVPNPublicKeyStmt, setVPNPublicKey, value)
+	_, err := q.db.Exec(ctx, setVPNPublicKey, value)
 	return err
 }

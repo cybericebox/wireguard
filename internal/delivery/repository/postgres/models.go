@@ -5,19 +5,21 @@
 package postgres
 
 import (
-	"database/sql"
+	"net/netip"
 	"time"
 
-	"github.com/sqlc-dev/pqtype"
+	"github.com/gofrs/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type VpnClient struct {
-	ID             string       `json:"id"`
-	IpAddress      pqtype.Inet  `json:"ip_address"`
-	PublicKey      string       `json:"public_key"`
-	PrivateKey     string       `json:"private_key"`
-	LaboratoryCidr pqtype.Inet  `json:"laboratory_cidr"`
-	Banned         bool         `json:"banned"`
-	UpdatedAt      sql.NullTime `json:"updated_at"`
-	CreatedAt      time.Time    `json:"created_at"`
+	UserID         uuid.UUID          `json:"user_id"`
+	GroupID        uuid.UUID          `json:"group_id"`
+	IpAddress      netip.Prefix       `json:"ip_address"`
+	PublicKey      string             `json:"public_key"`
+	PrivateKey     string             `json:"private_key"`
+	LaboratoryCidr netip.Prefix       `json:"laboratory_cidr"`
+	Banned         bool               `json:"banned"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	CreatedAt      time.Time          `json:"created_at"`
 }
