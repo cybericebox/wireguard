@@ -58,7 +58,7 @@ func newPostgresDB(ctx context.Context, cfg *config.PostgresConfig) (*pgxpool.Po
 }
 
 func runMigrations(cfg *config.PostgresConfig) error {
-	db, err := sql.Open("postgres", fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=%s", cfg.Username, cfg.Password, cfg.Database, cfg.Host, cfg.Port, cfg.SSLMode))
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", cfg.Username, cfg.Password, cfg.Database, cfg.Host, cfg.Port, cfg.SSLMode))
 	if err != nil {
 		return err
 	}

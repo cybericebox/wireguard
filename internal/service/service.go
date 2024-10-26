@@ -441,7 +441,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 	}
 
 	log.Debug().Str("Address: ", s.config.Address).
-		Int("ListenPort: ", s.config.Port).Msgf("Interface %s created and it is up", nic)
+		Str("ListenPort: ", s.config.Port).Msgf("Interface %s created and it is up", nic)
 
 	return nil
 }
