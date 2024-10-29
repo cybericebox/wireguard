@@ -98,7 +98,13 @@ func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning client config from cache")
 
-	return s.generateClientConfig(client)
+	clientConfig, err := s.generateClientConfig(client)
+	if err != nil {
+		return "", fmt.Errorf("generating client config error: [%w]", err)
+	}
+
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning client config")
+	return clientConfig, nil
 }
 
 func (s *Service) getFilteredClients(userID, groupID uuid.UUID, filter func(*model.Client) bool) []*model.Client {
@@ -131,6 +137,7 @@ func (s *Service) getFilteredClients(userID, groupID uuid.UUID, filter func(*mod
 		}
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning filtered clients")
 	return clients
 }
 
@@ -214,6 +221,7 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		}
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients deletion")
 	return nil
 }
 
@@ -283,6 +291,7 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = true
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients banning")
 	return nil
 
 }
@@ -353,6 +362,7 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = false
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients unbanning")
 	return nil
 
 }
@@ -427,6 +437,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client to cache")
 	s.clients[getClientID(client.UserID, client.GroupID)] = client
 
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Client created")
 	return nil
 }
 
@@ -555,5 +566,11 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client to cache")
 		s.clients[getClientID(client.UserID, client.GroupID)] = client
 	}
-	return errs
+
+	if errs != nil {
+		return errs
+	}
+
+	log.Debug().Msg("Clients created")
+	return nil
 }
