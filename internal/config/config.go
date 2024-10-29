@@ -97,6 +97,8 @@ func GetConfig() *Config {
 	// set log mode
 	if !instance.Debug {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	return instance

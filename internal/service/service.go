@@ -78,6 +78,7 @@ func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID
 	s.m.Lock()
 
 	// check if user exists
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Getting client config from cache")
 	client, ex := s.clients[getClientID(userID, groupID)]
 
 	s.m.Unlock()
@@ -88,32 +89,40 @@ func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID
 			GroupID:    groupID,
 			AllowedIPs: destCIDR,
 		}
-
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Creating new client")
 		// create user
 		if err := s.createClient(ctx, client); err != nil {
 			return "", fmt.Errorf("creating client error: [%w]", err)
 		}
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning client config from cache")
+
 	return s.generateClientConfig(client)
 }
 
-func (s *Service) getFilteredClients(userID, groupID uuid.UUID) []*model.Client {
+func (s *Service) getFilteredClients(userID, groupID uuid.UUID, filter func(*model.Client) bool) []*model.Client {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Getting filtered clients")
 	clients := make([]*model.Client, 0, len(s.clients))
 	for id, c := range s.clients {
-		if userID != uuid.Nil && groupID != uuid.Nil {
+		if filter != nil {
+			if !filter(c) {
+				continue
+			}
+		}
+		if !userID.IsNil() && !groupID.IsNil() {
 			if id == getClientID(userID, groupID) {
 				clients = append(clients, c)
 				break
 			}
-		} else if userID != uuid.Nil {
+		} else if !userID.IsNil() {
 			if c.UserID == userID {
 				clients = append(clients, c)
 			}
-		} else if groupID != uuid.Nil {
+		} else if !groupID.IsNil() {
 			if c.GroupID == groupID {
 				clients = append(clients, c)
 			}
@@ -131,26 +140,31 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 
 	var errs error
 
-	clients := s.getFilteredClients(userID, groupID)
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for deletion")
+	clients := s.getFilteredClients(userID, groupID, nil)
 
 	if len(clients) == 0 {
-		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
+		return nil
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting clients")
 	for _, c := range clients {
 		// delete user peer
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client peer")
 		if err := s.deletePeer(c.Address, c.PublicKey); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("deleting client peer error: [%w]", err))
 			continue
 		}
 
 		// delete nat rule
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client NAT rule")
 		if err := s.deleteNATRule(getClientID(c.UserID, c.GroupID), c.Address, c.AllowedIPs); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("deleting client NAT rule error: [%w]", err))
 			continue
 		}
 
 		// delete ban rule if user is banned
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client blocking rule")
 		if c.Banned {
 			if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
 				errs = multierror.Append(errs, fmt.Errorf("deleting client blocking rule error: [%w]", err))
@@ -162,11 +176,13 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		addr, _ := strings.CutSuffix(c.Address, "/32")
 
 		// release user address
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Releasing client ip")
 		if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("releasing client ip error: [%w]", err))
 			continue
 		}
 
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting client from cache")
 		delete(s.clients, getClientID(c.UserID, c.GroupID))
 	}
 
@@ -175,6 +191,7 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 	}
 
 	if len(clients) == 1 {
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting client from db")
 		if err := s.repository.DeleteVPNClient(ctx, postgres.DeleteVPNClientParams{
 			UserID:  userID,
 			GroupID: groupID,
@@ -182,12 +199,14 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 			return fmt.Errorf("deleting client from db error: [%w]", err)
 		}
 	} else {
-		if userID != uuid.Nil {
+		if !userID.IsNil() {
+			log.Debug().Str("userID", userID.String()).Msg("Deleting clients by userID from db")
 			if err := s.repository.DeleteVPNClientsByUserID(ctx, userID); err != nil {
 				return fmt.Errorf("deleting clients from db error: [%w]", err)
 			}
 		}
-		if groupID != uuid.Nil {
+		if !groupID.IsNil() {
+			log.Debug().Str("groupID", groupID.String()).Msg("Deleting clients by groupID from db")
 			if err := s.repository.DeleteVPNClientsByGroupID(ctx, groupID); err != nil {
 				return fmt.Errorf("deleting clients from db error: [%w]", err)
 			}
@@ -203,14 +222,19 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 
 	var errs error
 
-	clients := s.getFilteredClients(userID, groupID)
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for banning")
+	clients := s.getFilteredClients(userID, groupID, func(c *model.Client) bool {
+		return !c.Banned
+	})
 
 	if len(clients) == 0 {
-		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
+		return nil
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Banning clients")
 	for _, c := range clients {
 		// ban user
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Adding client blocking rule")
 		if err := s.addBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("adding client blocking rule error: [%w]", err))
 			continue
@@ -223,6 +247,7 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 	}
 
 	if len(clients) == 1 {
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating client ban status in db")
 		if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
 			UserID:  userID,
 			GroupID: groupID,
@@ -231,7 +256,8 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 			return fmt.Errorf("updating client ban status in db error: [%w]", err)
 		}
 	} else {
-		if userID != uuid.Nil {
+		if !userID.IsNil() {
+			log.Debug().Str("userID", userID.String()).Msg("Updating clients ban status by userID in db")
 			if err := s.repository.UpdateVPNClientBannedStatusByUserID(ctx, postgres.UpdateVPNClientBannedStatusByUserIDParams{
 				UserID: userID,
 				Banned: true,
@@ -239,7 +265,8 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 				return fmt.Errorf("updating client ban status in db error: [%w]", err)
 			}
 		}
-		if groupID != uuid.Nil {
+		if !groupID.IsNil() {
+			log.Debug().Str("groupID", groupID.String()).Msg("Updating clients ban status by groupID in db")
 			if err := s.repository.UpdateVPNClientBannedStatusByGroupID(ctx, postgres.UpdateVPNClientBannedStatusByGroupIDParams{
 				GroupID: groupID,
 				Banned:  true,
@@ -249,6 +276,7 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 		}
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in cache")
 	for _, c := range clients {
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = true
 	}
@@ -263,14 +291,19 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 
 	var errs error
 
-	clients := s.getFilteredClients(userID, groupID)
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for unbanning")
+	clients := s.getFilteredClients(userID, groupID, func(c *model.Client) bool {
+		return c.Banned
+	})
 
 	if len(clients) == 0 {
-		return fmt.Errorf("client with userID: [%s] and groupID: [%s] does not exist", userID, groupID)
+		return nil
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Unbanning clients")
 	for _, c := range clients {
 		// ban user
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client blocking rule")
 		if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("deleting client blocking rule error: [%w]", err))
 			continue
@@ -283,6 +316,7 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 	}
 
 	if len(clients) == 1 {
+		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating client ban status in db")
 		if err := s.repository.UpdateVPNClientBanStatus(ctx, postgres.UpdateVPNClientBanStatusParams{
 			UserID:  userID,
 			GroupID: groupID,
@@ -291,7 +325,8 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 			return fmt.Errorf("updating client ban status in db error: [%w]", err)
 		}
 	} else {
-		if userID != uuid.Nil {
+		if !userID.IsNil() {
+			log.Debug().Str("userID", userID.String()).Msg("Updating clients ban status by userID in db")
 			if err := s.repository.UpdateVPNClientBannedStatusByUserID(ctx, postgres.UpdateVPNClientBannedStatusByUserIDParams{
 				UserID: userID,
 				Banned: false,
@@ -299,7 +334,8 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 				return fmt.Errorf("updating client ban status in db error: [%w]", err)
 			}
 		}
-		if groupID != uuid.Nil {
+		if !groupID.IsNil() {
+			log.Debug().Str("groupID", groupID.String()).Msg("Updating clients ban status by groupID in db")
 			if err := s.repository.UpdateVPNClientBannedStatusByGroupID(ctx, postgres.UpdateVPNClientBannedStatusByGroupIDParams{
 				GroupID: groupID,
 				Banned:  false,
@@ -309,6 +345,7 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 		}
 	}
 
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in cache")
 	for _, c := range clients {
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = false
 	}
@@ -319,6 +356,8 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 
 func (s *Service) createClient(ctx context.Context, client *model.Client) (err error) {
 	// generate client address
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Creating new client")
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Acquiring client ip")
 	client.Address, err = s.ipaManager.AcquireSingleIP(ctx)
 	if err != nil {
 		return fmt.Errorf("acquiring client ip error: [%w]", err)
@@ -328,6 +367,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	client.Address = fmt.Sprintf("%s/32", client.Address)
 
 	// generate client key pair
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client key pair")
 	keys, err := s.keyGenerator.NewKeyPair()
 	if err != nil {
 		return fmt.Errorf("generating client key pair error: [%w]", err)
@@ -336,11 +376,13 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	client.PublicKey, client.PrivateKey = keys.PublicKey, keys.PrivateKey
 
 	// add client peer
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client peer")
 	if err = s.addPeer(client.Address, client.PublicKey); err != nil {
 		return fmt.Errorf("adding client peer error: [%w]", err)
 	}
 
 	// add nat rule
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client NAT rule")
 	if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
 		return fmt.Errorf("adding client NAT rule error: [%w]", err)
 	}
@@ -356,6 +398,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	}
 
 	// add client to db
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Creating client in db")
 	if err = s.repository.CreateVpnClient(ctx, postgres.CreateVpnClientParams{
 		UserID:         client.UserID,
 		GroupID:        client.GroupID,
@@ -368,6 +411,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	}
 
 	// generate client DNS address
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 	client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 	if err != nil {
 		return fmt.Errorf("generating client DNS ip error: [%w]", err)
@@ -377,6 +421,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	s.m.Lock()
 	defer s.m.Unlock()
 
+	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client to cache")
 	s.clients[getClientID(client.UserID, client.GroupID)] = client
 
 	return nil
@@ -385,23 +430,27 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 func (s *Service) InitServer(ctx context.Context) error {
 	var err error
 	// set wg server address
+	log.Debug().Msg("Setting server address")
 	s.config.Address, err = s.ipaManager.GetFirstIP()
 	if err != nil {
 		return fmt.Errorf("getting server ip error: [%w]", err)
 	}
 
 	// reserve server address
+	log.Debug().Str("Address: ", s.config.Address).Msg("Reserving server ip")
 	if _, err = s.ipaManager.AcquireSingleIP(ctx, s.config.Address); err != nil {
 		return fmt.Errorf("acquiring server ip error: [%w]", err)
 	}
 
 	// get server private key
+	log.Debug().Msg("Getting server private key from db")
 	s.config.PrivateKey, err = s.repository.GetVPNPrivateKey(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("getting server private key error: [%w]", err)
 	}
 
 	// get server public key
+	log.Debug().Msg("Getting server public key from db")
 	s.config.PublicKey, err = s.repository.GetVPNPublicKey(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("getting server public key error: [%w]", err)
@@ -410,6 +459,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 	// if server private key does not exist generate new key pair
 	if s.config.PrivateKey == "" || s.config.PublicKey == "" {
 		// generate server key pair
+		log.Debug().Msg("Key pair does not exist, generating new key pair")
 		keys, err := s.keyGenerator.NewKeyPair()
 		if err != nil {
 			return fmt.Errorf("generating server key pair error: [%w]", err)
@@ -418,24 +468,28 @@ func (s *Service) InitServer(ctx context.Context) error {
 		s.config.PrivateKey, s.config.PublicKey = keys.PrivateKey, keys.PublicKey
 
 		// save server key pair
+		log.Debug().Msg("Saving server private key pair to db")
 		if err = s.repository.SetVPNPrivateKey(ctx, s.config.PrivateKey); err != nil {
 			return fmt.Errorf("saving server private key error: [%w]", err)
 		}
-
+		log.Debug().Msg("Saving server public key pair to db")
 		if err = s.repository.SetVPNPublicKey(ctx, s.config.PublicKey); err != nil {
 			return fmt.Errorf("saving server public key error: [%w]", err)
 		}
 	}
 
+	log.Debug().Msg("Generating server config")
 	strConfig, err := s.generateServerConfig()
 	if err != nil {
 		return fmt.Errorf("creating wireguard config error: [%w]", err)
 	}
 
+	log.Debug().Msg("Writing server config to file")
 	if err = writeToFile(path.Join(configPath, nic+".conf"), strConfig); err != nil {
 		return fmt.Errorf("writing wireguard config to file error: [%w]", err)
 	}
 
+	log.Debug().Msg("Creating wireguard interface")
 	if err = upInterface(); err != nil {
 		return fmt.Errorf("making wireguard interface up error: [%w]", err)
 	}
@@ -446,11 +500,12 @@ func (s *Service) InitServer(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) InitServerUsers(ctx context.Context) (errs error) {
+func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	// get all users from db
+	log.Debug().Msg("Getting clients from db")
 	clients, err := s.repository.GetVPNClients(ctx)
 	if err != nil {
 		return fmt.Errorf("getting clients from db error: [%w]", err)
@@ -469,28 +524,32 @@ func (s *Service) InitServerUsers(ctx context.Context) (errs error) {
 			Banned:     c.Banned,
 		}
 		// generate user DNS address
+		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 		client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 		if err != nil {
 			return err
 
 		}
-
+		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client peer")
 		if err = s.addPeer(client.Address, client.PublicKey); err != nil {
 			errs = multierror.Append(fmt.Errorf("adding c peer error: [%w]", err))
 		}
 
 		// add nat rule
+		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client NAT rule")
 		if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
 			errs = multierror.Append(fmt.Errorf("adding c NAT rule error: [%w]", err))
 		}
 
 		// if user is banned add block rule
+		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Bool("banned", client.Banned).Msg("Adding client blocking rule if user is banned")
 		if client.Banned {
 			if err = s.addBlockRule(getClientID(client.UserID, client.GroupID), client.Address); err != nil {
 				errs = multierror.Append(fmt.Errorf("adding c blocking rule error: [%w]", err))
 			}
 		}
 
+		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client to cache")
 		s.clients[getClientID(client.UserID, client.GroupID)] = client
 	}
 	return errs
