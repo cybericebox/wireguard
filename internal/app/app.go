@@ -43,7 +43,7 @@ func Run() {
 		log.Fatal().Err(err).Msg("failed to init server")
 	}
 
-	if err = wgService.InitServerUsers(ctx); err != nil {
+	if err = wgService.InitServerClients(ctx); err != nil {
 		log.Fatal().Err(err).Msg("failed to init server users")
 	}
 
