@@ -75,13 +75,13 @@ func getClientID(userID, groupID uuid.UUID) string {
 }
 
 func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID, destCIDR string) (string, error) {
-	s.m.Lock()
+	s.m.RLock()
 
 	// check if user exists
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Getting client config from cache")
 	client, ex := s.clients[getClientID(userID, groupID)]
 
-	s.m.Unlock()
+	s.m.RUnlock()
 	// if user does not exist create new user
 	if !ex {
 		client = &model.Client{
@@ -142,9 +142,6 @@ func (s *Service) getFilteredClients(userID, groupID uuid.UUID, filter func(*mod
 }
 
 func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) error {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	var errs error
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for deletion")
@@ -189,9 +186,6 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 			errs = multierror.Append(errs, fmt.Errorf("releasing client ip error: [%w]", err))
 			continue
 		}
-
-		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting client from cache")
-		delete(s.clients, getClientID(c.UserID, c.GroupID))
 	}
 
 	if errs != nil {
@@ -221,14 +215,18 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		}
 	}
 
+	s.m.Lock()
+	defer s.m.Unlock()
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting clients from cache")
+	for _, c := range clients {
+		delete(s.clients, getClientID(c.UserID, c.GroupID))
+	}
+
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients deletion")
 	return nil
 }
 
 func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) error {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	var errs error
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for banning")
@@ -285,7 +283,8 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 			}
 		}
 	}
-
+	s.m.Lock()
+	defer s.m.Unlock()
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in cache")
 	for _, c := range clients {
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = true
@@ -297,9 +296,6 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) err
 }
 
 func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) error {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	var errs error
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Get clients for unbanning")
@@ -357,6 +353,8 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) e
 		}
 	}
 
+	s.m.Lock()
+	defer s.m.Unlock()
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in cache")
 	for _, c := range clients {
 		s.clients[getClientID(c.UserID, c.GroupID)].Banned = false
