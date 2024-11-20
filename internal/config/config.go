@@ -25,9 +25,10 @@ type (
 	}
 
 	GRPCConfig struct {
-		Endpoint string     `yaml:"endpoint" env:"WG_GRPC_LISTEN_ENDPOINT" env-default:"0.0.0.0:5454" env-description:"Listen endpoint of GRPC server"`
-		Auth     AuthConfig `yaml:"auth"`
-		TLS      TLSConfig  `yaml:"tls"`
+		Host string     `yaml:"host" env:"WG_GRPC_HOST" env-default:"0.0.0.0" env-description:"Host of GRPC server"`
+		Port string     `yaml:"port" env:"WG_GRPC_PORT" env-default:"5454" env-description:"Port of GRPC server"`
+		Auth AuthConfig `yaml:"auth"`
+		TLS  TLSConfig  `yaml:"tls"`
 	}
 
 	TLSConfig struct {
@@ -70,7 +71,7 @@ type (
 	}
 )
 
-func GetConfig() *Config {
+func MustGetConfig() *Config {
 	path := flag.String("config", "", "Path to config file")
 	flag.Parse()
 

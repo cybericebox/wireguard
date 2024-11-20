@@ -6,23 +6,17 @@ package postgres
 
 import (
 	"context"
-
-	"github.com/gofrs/uuid"
 )
 
 type Querier interface {
 	CreateVpnClient(ctx context.Context, arg CreateVpnClientParams) error
-	DeleteVPNClient(ctx context.Context, arg DeleteVPNClientParams) error
-	DeleteVPNClientsByGroupID(ctx context.Context, groupID uuid.UUID) error
-	DeleteVPNClientsByUserID(ctx context.Context, userID uuid.UUID) error
+	DeleteVPNClients(ctx context.Context, arg DeleteVPNClientsParams) (int64, error)
 	GetVPNClients(ctx context.Context) ([]VpnClient, error)
-	GetVPNPrivateKey(ctx context.Context) (string, error)
-	GetVPNPublicKey(ctx context.Context) (string, error)
-	SetVPNPrivateKey(ctx context.Context, value string) error
-	SetVPNPublicKey(ctx context.Context, value string) error
-	UpdateVPNClientBanStatus(ctx context.Context, arg UpdateVPNClientBanStatusParams) error
-	UpdateVPNClientBannedStatusByGroupID(ctx context.Context, arg UpdateVPNClientBannedStatusByGroupIDParams) error
-	UpdateVPNClientBannedStatusByUserID(ctx context.Context, arg UpdateVPNClientBannedStatusByUserIDParams) error
+	GetVPNServerPrivateKey(ctx context.Context) (string, error)
+	GetVPNServerPublicKey(ctx context.Context) (string, error)
+	SetVPNServerPrivateKey(ctx context.Context, value string) error
+	SetVPNServerPublicKey(ctx context.Context, value string) error
+	UpdateVPNClientsBanStatus(ctx context.Context, arg UpdateVPNClientsBanStatusParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

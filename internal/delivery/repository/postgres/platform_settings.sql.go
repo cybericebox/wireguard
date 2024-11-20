@@ -9,50 +9,50 @@ import (
 	"context"
 )
 
-const getVPNPrivateKey = `-- name: GetVPNPrivateKey :one
+const getVPNServerPrivateKey = `-- name: GetVPNServerPrivateKey :one
 select value
 from platform_settings
 where type = 'vpn'
   and key = 'private_key'
 `
 
-func (q *Queries) GetVPNPrivateKey(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, getVPNPrivateKey)
+func (q *Queries) GetVPNServerPrivateKey(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, getVPNServerPrivateKey)
 	var value string
 	err := row.Scan(&value)
 	return value, err
 }
 
-const getVPNPublicKey = `-- name: GetVPNPublicKey :one
+const getVPNServerPublicKey = `-- name: GetVPNServerPublicKey :one
 select value
 from platform_settings
 where type = 'vpn'
   and key = 'public_key'
 `
 
-func (q *Queries) GetVPNPublicKey(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, getVPNPublicKey)
+func (q *Queries) GetVPNServerPublicKey(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, getVPNServerPublicKey)
 	var value string
 	err := row.Scan(&value)
 	return value, err
 }
 
-const setVPNPrivateKey = `-- name: SetVPNPrivateKey :exec
+const setVPNServerPrivateKey = `-- name: SetVPNServerPrivateKey :exec
 insert into platform_settings (type, key, value)
 values ('vpn', 'private_key', $1)
 `
 
-func (q *Queries) SetVPNPrivateKey(ctx context.Context, value string) error {
-	_, err := q.db.Exec(ctx, setVPNPrivateKey, value)
+func (q *Queries) SetVPNServerPrivateKey(ctx context.Context, value string) error {
+	_, err := q.db.Exec(ctx, setVPNServerPrivateKey, value)
 	return err
 }
 
-const setVPNPublicKey = `-- name: SetVPNPublicKey :exec
+const setVPNServerPublicKey = `-- name: SetVPNServerPublicKey :exec
 insert into platform_settings (type, key, value)
 values ('vpn', 'public_key', $1)
 `
 
-func (q *Queries) SetVPNPublicKey(ctx context.Context, value string) error {
-	_, err := q.db.Exec(ctx, setVPNPublicKey, value)
+func (q *Queries) SetVPNServerPublicKey(ctx context.Context, value string) error {
+	_, err := q.db.Exec(ctx, setVPNServerPublicKey, value)
 	return err
 }

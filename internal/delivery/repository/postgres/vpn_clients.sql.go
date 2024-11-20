@@ -38,42 +38,24 @@ func (q *Queries) CreateVpnClient(ctx context.Context, arg CreateVpnClientParams
 	return err
 }
 
-const deleteVPNClient = `-- name: DeleteVPNClient :exec
+const deleteVPNClients = `-- name: DeleteVPNClients :execrows
 delete
 from vpn_clients
-where user_id = $1 and group_id = $2
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id)
 `
 
-type DeleteVPNClientParams struct {
+type DeleteVPNClientsParams struct {
 	UserID  uuid.UUID `json:"user_id"`
 	GroupID uuid.UUID `json:"group_id"`
 }
 
-func (q *Queries) DeleteVPNClient(ctx context.Context, arg DeleteVPNClientParams) error {
-	_, err := q.db.Exec(ctx, deleteVPNClient, arg.UserID, arg.GroupID)
-	return err
-}
-
-const deleteVPNClientsByGroupID = `-- name: DeleteVPNClientsByGroupID :exec
-delete
-from vpn_clients
-where group_id = $1
-`
-
-func (q *Queries) DeleteVPNClientsByGroupID(ctx context.Context, groupID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteVPNClientsByGroupID, groupID)
-	return err
-}
-
-const deleteVPNClientsByUserID = `-- name: DeleteVPNClientsByUserID :exec
-delete
-from vpn_clients
-where user_id = $1
-`
-
-func (q *Queries) DeleteVPNClientsByUserID(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteVPNClientsByUserID, userID)
-	return err
+func (q *Queries) DeleteVPNClients(ctx context.Context, arg DeleteVPNClientsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteVPNClients, arg.UserID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getVPNClients = `-- name: GetVPNClients :many
@@ -119,54 +101,24 @@ func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
 	return items, nil
 }
 
-const updateVPNClientBanStatus = `-- name: UpdateVPNClientBanStatus :exec
+const updateVPNClientsBanStatus = `-- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
-set banned = $3,
+set banned     = $3,
     updated_at = now()
-where user_id = $1 and group_id = $2
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id)
 `
 
-type UpdateVPNClientBanStatusParams struct {
+type UpdateVPNClientsBanStatusParams struct {
 	UserID  uuid.UUID `json:"user_id"`
 	GroupID uuid.UUID `json:"group_id"`
 	Banned  bool      `json:"banned"`
 }
 
-func (q *Queries) UpdateVPNClientBanStatus(ctx context.Context, arg UpdateVPNClientBanStatusParams) error {
-	_, err := q.db.Exec(ctx, updateVPNClientBanStatus, arg.UserID, arg.GroupID, arg.Banned)
-	return err
-}
-
-const updateVPNClientBannedStatusByGroupID = `-- name: UpdateVPNClientBannedStatusByGroupID :exec
-update vpn_clients
-set banned = $2,
-    updated_at = now()
-where group_id = $1
-`
-
-type UpdateVPNClientBannedStatusByGroupIDParams struct {
-	GroupID uuid.UUID `json:"group_id"`
-	Banned  bool      `json:"banned"`
-}
-
-func (q *Queries) UpdateVPNClientBannedStatusByGroupID(ctx context.Context, arg UpdateVPNClientBannedStatusByGroupIDParams) error {
-	_, err := q.db.Exec(ctx, updateVPNClientBannedStatusByGroupID, arg.GroupID, arg.Banned)
-	return err
-}
-
-const updateVPNClientBannedStatusByUserID = `-- name: UpdateVPNClientBannedStatusByUserID :exec
-update vpn_clients
-set banned = $2,
-    updated_at = now()
-where user_id = $1
-`
-
-type UpdateVPNClientBannedStatusByUserIDParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	Banned bool      `json:"banned"`
-}
-
-func (q *Queries) UpdateVPNClientBannedStatusByUserID(ctx context.Context, arg UpdateVPNClientBannedStatusByUserIDParams) error {
-	_, err := q.db.Exec(ctx, updateVPNClientBannedStatusByUserID, arg.UserID, arg.Banned)
-	return err
+func (q *Queries) UpdateVPNClientsBanStatus(ctx context.Context, arg UpdateVPNClientsBanStatusParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateVPNClientsBanStatus, arg.UserID, arg.GroupID, arg.Banned)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cybericebox/wireguard/internal/config"
+	"github.com/cybericebox/wireguard/pkg/appError"
 	"github.com/golang-migrate/migrate/v4"
 	pg "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -45,12 +46,12 @@ func newPostgresDB(ctx context.Context, cfg *config.PostgresConfig) (*pgxpool.Po
 		fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", cfg.Username, cfg.Password, cfg.Database, cfg.Host, cfg.Port, cfg.SSLMode))
 	conn, err := pgxpool.NewWithConfig(ctx, ConnConfig)
 	if err != nil {
-		return nil, err
+		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Raise()
 	}
 
 	// ping db
 	if err = conn.Ping(ctx); err != nil {
-		return nil, err
+		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to ping db").Raise()
 	}
 
 	return conn, nil
@@ -72,7 +73,7 @@ func runMigrations(cfg *config.PostgresConfig) error {
 		DatabaseName:    cfg.Database,
 	})
 	if err != nil {
-		return err
+		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Raise()
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
@@ -82,13 +83,17 @@ func runMigrations(cfg *config.PostgresConfig) error {
 	)
 
 	if err != nil {
-		return err
+		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create migration driver").Raise()
 	}
 
 	if err = m.Up(); err != nil {
 		if !errors.Is(migrate.ErrNoChange, err) {
-			return err
+			return appError.ErrPostgres.WithError(err).WithMessage("Failed to run migrations").Raise()
 		}
 	}
 	return nil
+}
+
+func (r *PostgresRepository) Close() {
+	r.db.Close()
 }

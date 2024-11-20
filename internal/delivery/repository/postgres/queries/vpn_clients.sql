@@ -14,37 +14,15 @@ select user_id,
        created_at
 from vpn_clients;
 
--- name: UpdateVPNClientBanStatus :exec
+-- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
 set banned     = $3,
     updated_at = now()
-where user_id = $1
-  and group_id = $2;
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id);
 
--- name: UpdateVPNClientBannedStatusByGroupID :exec
-update vpn_clients
-set banned     = $2,
-    updated_at = now()
-where group_id = $1;
-
--- name: UpdateVPNClientBannedStatusByUserID :exec
-update vpn_clients
-set banned     = $2,
-    updated_at = now()
-where user_id = $1;
-
--- name: DeleteVPNClient :exec
+-- name: DeleteVPNClients :execrows
 delete
 from vpn_clients
-where user_id = $1
-  and group_id = $2;
-
--- name: DeleteVPNClientsByGroupID :exec
-delete
-from vpn_clients
-where group_id = $1;
-
--- name: DeleteVPNClientsByUserID :exec
-delete
-from vpn_clients
-where user_id = $1;
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id);

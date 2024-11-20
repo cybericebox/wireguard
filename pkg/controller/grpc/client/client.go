@@ -2,8 +2,7 @@ package client
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"github.com/cybericebox/wireguard/pkg/appError"
 	"github.com/cybericebox/wireguard/pkg/controller/grpc/protobuf"
 	"github.com/golang-jwt/jwt"
 	"github.com/rs/zerolog/log"
@@ -11,18 +10,12 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"strings"
 )
 
 const (
 	NoTokenErrMsg      = "token contains an invalid number of segments"
 	UnauthorizedErrMsg = "unauthorized"
 	AuthKey            = "authKey"
-)
-
-var (
-	UnreachableDBErr = errors.New("database seems to be unreachable")
-	UnauthorizedErr  = errors.New("you seem to not be logged in")
 )
 
 type Credentials struct {
@@ -62,7 +55,7 @@ func getCredentials(conf TLS) (credentials.TransportCredentials, error) {
 	if conf.Enabled {
 		creds, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.CertKey)
 		if err != nil {
-			return nil, err
+			return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to create server credentials").Raise()
 		}
 		return creds, nil
 	} else {
@@ -76,19 +69,17 @@ func translateRPCErr(err error) error {
 		msg := st.Message()
 		switch {
 		case UnauthorizedErrMsg == msg:
-			return UnauthorizedErr
+			return appError.ErrGRPCUnauthenticated.WithError(err).Raise()
 
 		case NoTokenErrMsg == msg:
-			return UnauthorizedErr
+			return appError.ErrGRPCUnauthenticated.WithError(err).Raise()
 
-		case strings.Contains(msg, "TransientFailure"):
-			return UnreachableDBErr
 		}
 
-		return err
+		return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Raise()
 	}
 
-	return err
+	return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Raise()
 }
 
 func constructAuthCredentials(authKey, signKey string) (Credentials, error) {
@@ -103,16 +94,17 @@ func constructAuthCredentials(authKey, signKey string) (Credentials, error) {
 	return authCreds, nil
 }
 
-func NewWireguardConnection(config Config) (protobuf.WireguardClient, error) {
+// NewWireguardConnection creates a new connection to the wireguard service and returns the client and a function to close the connection
+func NewWireguardConnection(config Config) (protobuf.WireguardClient, func() error, error) {
 	log.Debug().Str("url", config.Endpoint).Msg("Connecting to wireguard")
 
 	authCreds, err := constructAuthCredentials(config.Auth.AuthKey, config.Auth.SignKey)
 	if err != nil {
-		return nil, fmt.Errorf("[wireguard]: Error in constructing auth credentials %v", err)
+		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to construct auth credentials").Raise()
 	}
 	creds, err := getCredentials(config.TLS)
 	if err != nil {
-		return nil, err
+		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Raise()
 	}
 	var dialOpts []grpc.DialOption
 	if config.TLS.Enabled {
@@ -131,10 +123,10 @@ func NewWireguardConnection(config Config) (protobuf.WireguardClient, error) {
 
 	conn, err := grpc.NewClient(config.Endpoint, dialOpts...)
 	if err != nil {
-		return nil, translateRPCErr(err)
+		return nil, nil, translateRPCErr(err)
 	}
 
 	client := protobuf.NewWireguardClient(conn)
 
-	return client, nil
+	return client, conn.Close, nil
 }

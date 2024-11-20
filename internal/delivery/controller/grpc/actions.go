@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"github.com/cybericebox/wireguard/pkg/appError"
 	"github.com/cybericebox/wireguard/pkg/controller/grpc/protobuf"
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
@@ -9,9 +10,9 @@ import (
 
 type Service interface {
 	GetClientConfig(ctx context.Context, userID, groupID uuid.UUID, destCIDR string) (string, error)
-	DeleteClients(ctx context.Context, userID, groupID uuid.UUID) error
-	BanClients(ctx context.Context, userID, groupID uuid.UUID) error
-	UnBanClients(ctx context.Context, userID, groupID uuid.UUID) error
+	DeleteClients(ctx context.Context, userID, groupID uuid.UUID) (int64, error)
+	BanClients(ctx context.Context, userID, groupID uuid.UUID) (int64, error)
+	UnBanClients(ctx context.Context, userID, groupID uuid.UUID) (int64, error)
 }
 
 func (w *Wireguard) GetClientConfig(ctx context.Context, request *protobuf.ClientConfigRequest) (*protobuf.ConfigResponse, error) {
@@ -21,14 +22,14 @@ func (w *Wireguard) GetClientConfig(ctx context.Context, request *protobuf.Clien
 	userID, err := uuid.FromString(request.GetUserID())
 	if err != nil {
 		log.Error().Err(err).Msg("Parsing user ID")
-		return &protobuf.ConfigResponse{}, err
+		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidUserID.Raise()
 	}
 
 	log.Debug().Str("groupID", request.GetGroupID()).Msg("Parsing group ID")
 	groupID, err := uuid.FromString(request.GetGroupID())
 	if err != nil {
 		log.Error().Err(err).Msg("Parsing group ID")
-		return &protobuf.ConfigResponse{}, err
+		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidGroupID.Raise()
 	}
 
 	log.Debug().Str("destCIDR", request.GetDestCIDR()).Msg("Getting client config")
@@ -41,32 +42,41 @@ func (w *Wireguard) GetClientConfig(ctx context.Context, request *protobuf.Clien
 	return &protobuf.ConfigResponse{Config: config}, nil
 }
 
-func (w *Wireguard) DeleteClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.EmptyResponse, error) {
+func (w *Wireguard) DeleteClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.ClientsResponse, error) {
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Deleting clients")
-	if err := w.service.DeleteClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID())); err != nil {
+	affected, err := w.service.DeleteClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID()))
+	if err != nil {
 		log.Error().Err(err).Msg("Deleting client")
-		return &protobuf.EmptyResponse{}, err
+		return &protobuf.ClientsResponse{}, err
 	}
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Clients are deleted")
-	return &protobuf.EmptyResponse{}, nil
+	return &protobuf.ClientsResponse{
+		ClientsAffected: affected,
+	}, nil
 }
 
-func (w *Wireguard) BanClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.EmptyResponse, error) {
+func (w *Wireguard) BanClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.ClientsResponse, error) {
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Banning clients")
-	if err := w.service.BanClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID())); err != nil {
+	affected, err := w.service.BanClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID()))
+	if err != nil {
 		log.Error().Err(err).Msg("Banning client")
-		return &protobuf.EmptyResponse{}, err
+		return &protobuf.ClientsResponse{}, err
 	}
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Clients are banned")
-	return &protobuf.EmptyResponse{}, nil
+	return &protobuf.ClientsResponse{
+		ClientsAffected: affected,
+	}, nil
 }
 
-func (w *Wireguard) UnBanClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.EmptyResponse, error) {
+func (w *Wireguard) UnBanClients(ctx context.Context, request *protobuf.ClientsRequest) (*protobuf.ClientsResponse, error) {
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Unbanning clients")
-	if err := w.service.UnBanClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID())); err != nil {
+	affected, err := w.service.UnBanClients(ctx, uuid.FromStringOrNil(request.GetUserID()), uuid.FromStringOrNil(request.GetGroupID()))
+	if err != nil {
 		log.Error().Err(err).Msg("Unbanning client")
-		return &protobuf.EmptyResponse{}, err
+		return &protobuf.ClientsResponse{}, err
 	}
 	log.Debug().Str("userID", request.GetUserID()).Str("groupID", request.GetGroupID()).Msg("Clients are unbanned")
-	return &protobuf.EmptyResponse{}, nil
+	return &protobuf.ClientsResponse{
+		ClientsAffected: affected,
+	}, nil
 }
