@@ -49,7 +49,7 @@ func (s *Service) addPeer(ip, publicKey string) error {
 	log.Debug().Str("command", command).Msg("Adding peer")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to add peer").WithContext("command", command).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to add peer").WithContext("command", command).Err()
 	}
 
 	command = fmt.Sprintf("ip -4 route add %s dev %s", ip, nic)
@@ -57,7 +57,7 @@ func (s *Service) addPeer(ip, publicKey string) error {
 	log.Debug().Str("command", command).Msg("Adding route")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to add route").WithContext("command", command).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to add route").WithContext("command", command).Err()
 	}
 
 	return nil
@@ -71,7 +71,7 @@ func (s *Service) deletePeer(ip, publicKey string) error {
 	log.Debug().Str("command", command).Msg("Deleting peer")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to delete peer").WithContext("command", command).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to delete peer").WithContext("command", command).Err()
 	}
 
 	command = fmt.Sprintf("ip -4 route delete %s dev %s", ip, nic)
@@ -79,7 +79,7 @@ func (s *Service) deletePeer(ip, publicKey string) error {
 	log.Debug().Str("command", command).Msg("Deleting route")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to delete route").WithContext("command", command).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to delete route").WithContext("command", command).Err()
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func (s *Service) deletePeer(ip, publicKey string) error {
 func (s *Service) generateServerConfig() (string, error) {
 	config, err := s.generateConfig(serverConfigTemplate, s.config)
 	if err != nil {
-		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to generate server config").Raise()
+		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to generate server config").Err()
 	}
 
 	return config, nil
@@ -103,7 +103,7 @@ func (s *Service) generateClientConfig(data *model.Client) (string, error) {
 
 	config, err := s.generateConfig(clientConfigTemplate, data)
 	if err != nil {
-		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to generate client config").Raise()
+		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to generate client config").Err()
 	}
 
 	return config, nil
@@ -114,11 +114,11 @@ func (s *Service) generateConfig(tmpl string, data interface{}) (string, error) 
 
 	t, err := template.New("config").Parse(tmpl)
 	if err != nil {
-		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to parse template").Raise()
+		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to parse template").Err()
 	}
 
 	if err = t.Execute(&tpl, data); err != nil {
-		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to execute template").Raise()
+		return "", appError.ErrWireguard.WithError(err).WithMessage("Failed to execute template").Err()
 	}
 
 	return tpl.String(), nil
@@ -127,7 +127,7 @@ func (s *Service) generateConfig(tmpl string, data interface{}) (string, error) 
 func writeToFile(filename string, data string) error {
 	file, err := os.Create(filename)
 	if err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to create file").WithContext("filename", filename).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to create file").WithContext("filename", filename).Err()
 	}
 	defer func() {
 		if err = file.Close(); err != nil {
@@ -136,11 +136,11 @@ func writeToFile(filename string, data string) error {
 	}()
 
 	if _, err = io.WriteString(file, data); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to write to file").WithContext("filename", filename).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to write to file").WithContext("filename", filename).Err()
 	}
 
 	if err = file.Sync(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to sync file").WithContext("filename", filename).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to sync file").WithContext("filename", filename).Err()
 	}
 
 	return nil
@@ -152,7 +152,7 @@ func upInterface() error {
 	log.Info().Str("interface", nic).Msg("Interface is called to be up")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrWireguard.WithError(err).WithMessage("Failed to up interface").WithContext("interface", nic).Raise()
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to up interface").WithContext("interface", nic).Err()
 	}
 
 	return nil

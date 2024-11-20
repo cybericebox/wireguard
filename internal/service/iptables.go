@@ -18,7 +18,7 @@ func (s *Service) addNATRule(id, ip, destCidr string) error {
 	log.Debug().Str("command", command).Msg("Adding NAT rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrIptables.WithError(err).WithMessage("Failed to add NAT rule").WithContext("command", command).Raise()
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to add NAT rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -29,7 +29,7 @@ func (s *Service) deleteNATRule(id, ip, destCidr string) error {
 	log.Debug().Str("command", command).Msg("Deleting NAT rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete NAT rule").WithContext("command", command).Raise()
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete NAT rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -40,7 +40,7 @@ func (s *Service) addBlockRule(id, ip string) error {
 	log.Debug().Str("command", command).Msg("Adding blocking rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrIptables.WithError(err).WithMessage("Failed to add blocking rule").WithContext("command", command).Raise()
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to add blocking rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -51,7 +51,7 @@ func (s *Service) deleteBlockRule(id, ip string) error {
 	log.Debug().Str("command", command).Msg("Deleting blocking rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete blocking rule").WithContext("command", command).Raise()
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete blocking rule").WithContext("command", command).Err()
 	}
 	return nil
 }

@@ -55,7 +55,7 @@ func getCredentials(conf TLS) (credentials.TransportCredentials, error) {
 	if conf.Enabled {
 		creds, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.CertKey)
 		if err != nil {
-			return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to create server credentials").Raise()
+			return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to create server credentials").Err()
 		}
 		return creds, nil
 	} else {
@@ -69,17 +69,17 @@ func translateRPCErr(err error) error {
 		msg := st.Message()
 		switch {
 		case UnauthorizedErrMsg == msg:
-			return appError.ErrGRPCUnauthenticated.WithError(err).Raise()
+			return appError.ErrGRPCUnauthenticated.WithError(err).Err()
 
 		case NoTokenErrMsg == msg:
-			return appError.ErrGRPCUnauthenticated.WithError(err).Raise()
+			return appError.ErrGRPCUnauthenticated.WithError(err).Err()
 
 		}
 
-		return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Raise()
+		return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Err()
 	}
 
-	return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Raise()
+	return appError.ErrGRPC.WithError(err).WithMessage("Failed to perform RPC").Err()
 }
 
 func constructAuthCredentials(authKey, signKey string) (Credentials, error) {
@@ -100,11 +100,11 @@ func NewWireguardConnection(config Config) (protobuf.WireguardClient, func() err
 
 	authCreds, err := constructAuthCredentials(config.Auth.AuthKey, config.Auth.SignKey)
 	if err != nil {
-		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to construct auth credentials").Raise()
+		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to construct auth credentials").Err()
 	}
 	creds, err := getCredentials(config.TLS)
 	if err != nil {
-		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Raise()
+		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Err()
 	}
 	var dialOpts []grpc.DialOption
 	if config.TLS.Enabled {

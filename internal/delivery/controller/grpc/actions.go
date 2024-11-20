@@ -22,14 +22,14 @@ func (w *Wireguard) GetClientConfig(ctx context.Context, request *protobuf.Clien
 	userID, err := uuid.FromString(request.GetUserID())
 	if err != nil {
 		log.Error().Err(err).Msg("Parsing user ID")
-		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidUserID.Raise()
+		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidUserID.Err()
 	}
 
 	log.Debug().Str("groupID", request.GetGroupID()).Msg("Parsing group ID")
 	groupID, err := uuid.FromString(request.GetGroupID())
 	if err != nil {
 		log.Error().Err(err).Msg("Parsing group ID")
-		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidGroupID.Raise()
+		return &protobuf.ConfigResponse{}, appError.ErrClientInvalidGroupID.Err()
 	}
 
 	log.Debug().Str("destCIDR", request.GetDestCIDR()).Msg("Getting client config")

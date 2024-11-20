@@ -91,7 +91,7 @@ func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Creating new client")
 		// create user
 		if err := s.createClient(ctx, client); err != nil {
-			return "", appError.ErrClient.WithError(err).WithMessage("Failed to create client").Raise()
+			return "", appError.ErrClient.WithError(err).WithMessage("Failed to create client").Err()
 		}
 	}
 
@@ -99,7 +99,7 @@ func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID
 
 	clientConfig, err := s.generateClientConfig(client)
 	if err != nil {
-		return "", appError.ErrClient.WithError(err).WithMessage("Failed to generate client config").Raise()
+		return "", appError.ErrClient.WithError(err).WithMessage("Failed to generate client config").Err()
 	}
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning client config")
@@ -156,14 +156,14 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		// delete user peer
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client peer")
 		if err := s.deletePeer(c.Address, c.PublicKey); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client peer").Raise())
+			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client peer").Err())
 			continue
 		}
 
 		// delete nat rule
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client NAT rule")
 		if err := s.deleteNATRule(getClientID(c.UserID, c.GroupID), c.Address, c.AllowedIPs); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client NAT rule").Raise())
+			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client NAT rule").Err())
 			continue
 		}
 
@@ -171,7 +171,7 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client blocking rule")
 		if c.Banned {
 			if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
-				errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client blocking rule").Raise())
+				errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client blocking rule").Err())
 				continue
 			}
 		}
@@ -182,13 +182,13 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		// release user address
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Releasing client ip")
 		if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to release client ip").Raise())
+			errs = multierror.Append(errs, appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to release client ip").Err())
 			continue
 		}
 	}
 
 	if errs != nil {
-		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to delete clients").Raise()
+		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to delete clients").Err()
 	}
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting client from db")
@@ -197,7 +197,7 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		GroupID: groupID,
 	})
 	if err != nil {
-		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to delete clients from db").Raise()
+		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to delete clients from db").Err()
 	}
 
 	s.m.Lock()
@@ -229,13 +229,13 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) (in
 		// ban user
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Adding client blocking rule")
 		if err := s.addBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to add client blocking rule").Raise())
+			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to add client blocking rule").Err())
 			continue
 		}
 	}
 
 	if errs != nil {
-		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to ban clients").Raise()
+		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to ban clients").Err()
 	}
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in db")
@@ -246,7 +246,7 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) (in
 	})
 
 	if err != nil {
-		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to update clients ban status in db").Raise()
+		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to update clients ban status in db").Err()
 	}
 
 	s.m.Lock()
@@ -279,14 +279,14 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) (
 		// ban user
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Deleting client blocking rule")
 		if err := s.deleteBlockRule(getClientID(c.UserID, c.GroupID), c.Address); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client blocking rule").Raise())
+			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to delete client blocking rule").Err())
 			continue
 		}
 
 	}
 
 	if errs != nil {
-		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to unban clients").Raise()
+		return 0, appError.ErrClient.WithError(errs).WithMessage("Failed to unban clients").Err()
 	}
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in db")
@@ -297,7 +297,7 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) (
 	})
 
 	if err != nil {
-		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to update clients ban status in db").Raise()
+		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to update clients ban status in db").Err()
 	}
 
 	s.m.Lock()
@@ -318,7 +318,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Acquiring client ip")
 	client.Address, err = s.ipaManager.AcquireSingleIP(ctx)
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to acquire client ip").Raise()
+		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to acquire client ip").Err()
 	}
 
 	// add 32 mask to address
@@ -328,7 +328,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client key pair")
 	keys, err := s.keyGenerator.NewKeyPair()
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate client key pair").Raise()
+		return appError.ErrClient.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate client key pair").Err()
 	}
 
 	client.PublicKey, client.PrivateKey = keys.PublicKey, keys.PrivateKey
@@ -336,23 +336,23 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	// add client peer
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client peer")
 	if err = s.addPeer(client.Address, client.PublicKey); err != nil {
-		return appError.ErrClient.WithError(err).WithMessage("Failed to add client peer").Raise()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to add client peer").Err()
 	}
 
 	ip, err := netip.ParsePrefix(client.Address)
 	if err != nil {
-		return appError.ErrClient.WithError(err).WithMessage("Failed to parse client address").Raise()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to parse client address").Err()
 	}
 
 	allowedIPs, err := netip.ParsePrefix(client.AllowedIPs)
 	if err != nil {
-		return appError.ErrClientInvalidAllowedIPs.WithError(err).Raise()
+		return appError.ErrClientInvalidAllowedIPs.WithError(err).Err()
 	}
 
 	// add nat rule
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client NAT rule")
 	if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
-		return appError.ErrClient.WithError(err).WithMessage("Failed to add client NAT rule").Raise()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to add client NAT rule").Err()
 	}
 
 	// add client to db
@@ -365,14 +365,14 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 		PrivateKey:     client.PrivateKey,
 		LaboratoryCidr: allowedIPs,
 	}); err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to create client in db").Raise()
+		return appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to create client in db").Err()
 	}
 
 	// generate client DNS address
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 	client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to generate client DNS ip").Raise()
+		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to generate client DNS ip").Err()
 	}
 
 	s.m.Lock()
@@ -391,27 +391,27 @@ func (s *Service) InitServer(ctx context.Context) error {
 	log.Debug().Msg("Setting server address")
 	s.config.Address, err = s.ipaManager.GetFirstIP()
 	if err != nil {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to get vpn server address").Raise()
+		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to get vpn server address").Err()
 	}
 
 	// reserve server address
 	log.Debug().Str("Address: ", s.config.Address).Msg("Reserving server ip")
 	if _, err = s.ipaManager.AcquireSingleIP(ctx, s.config.Address); err != nil {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to reserve vpn server address").Raise()
+		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to reserve vpn server address").Err()
 	}
 
 	// get server private key
 	log.Debug().Msg("Getting server private key from db")
 	s.config.PrivateKey, err = s.repository.GetVPNServerPrivateKey(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server private key from db").Raise()
+		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server private key from db").Err()
 	}
 
 	// get server public key
 	log.Debug().Msg("Getting server public key from db")
 	s.config.PublicKey, err = s.repository.GetVPNServerPublicKey(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server public key from db").Raise()
+		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server public key from db").Err()
 	}
 
 	// if server private key does not exist generate new key pair
@@ -420,7 +420,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 		log.Debug().Msg("Key pair does not exist, generating new key pair")
 		keys, err := s.keyGenerator.NewKeyPair()
 		if err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate server key pair").Raise()
+			return appError.ErrPlatform.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate server key pair").Err()
 		}
 
 		s.config.PrivateKey, s.config.PublicKey = keys.PrivateKey, keys.PublicKey
@@ -428,28 +428,28 @@ func (s *Service) InitServer(ctx context.Context) error {
 		// save server key pair
 		log.Debug().Msg("Saving server private key pair to db")
 		if err = s.repository.SetVPNServerPrivateKey(ctx, s.config.PrivateKey); err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server private key to db").Raise()
+			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server private key to db").Err()
 		}
 		log.Debug().Msg("Saving server public key pair to db")
 		if err = s.repository.SetVPNServerPublicKey(ctx, s.config.PublicKey); err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server public key to db").Raise()
+			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server public key to db").Err()
 		}
 	}
 
 	log.Debug().Msg("Generating server config")
 	strConfig, err := s.generateServerConfig()
 	if err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server config").Raise()
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server config").Err()
 	}
 
 	log.Debug().Msg("Writing server config to file")
 	if err = writeToFile(path.Join(configPath, nic+".conf"), strConfig); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to write server config to file").Raise()
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to write server config to file").Err()
 	}
 
 	log.Debug().Msg("Creating wireguard interface")
 	if err = upInterface(); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create wireguard interface").Raise()
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create wireguard interface").Err()
 	}
 
 	log.Debug().Str("Address: ", s.config.Address).
@@ -466,7 +466,7 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 	log.Debug().Msg("Getting clients from db")
 	clients, err := s.repository.GetVPNClients(ctx)
 	if err != nil {
-		return appError.ErrPlatform.WithError(appError.ErrPostgres.WithError(err).Raise()).WithMessage("Failed to get clients from db").Raise()
+		return appError.ErrPlatform.WithError(appError.ErrPostgres.WithError(err).Err()).WithMessage("Failed to get clients from db").Err()
 	}
 	// create users
 	for _, c := range clients {
@@ -485,19 +485,19 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 		client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 		if err != nil {
-			errs = multierror.Append(errs, appError.ErrPlatform.WithError(appError.ErrIPAM.WithError(err).Raise()).WithMessage("Failed to generate client DNS ip").Raise())
+			errs = multierror.Append(errs, appError.ErrPlatform.WithError(appError.ErrIPAM.WithError(err).Err()).WithMessage("Failed to generate client DNS ip").Err())
 			continue
 		}
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client peer")
 		if err = s.addPeer(client.Address, client.PublicKey); err != nil {
-			errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client peer").Raise())
+			errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client peer").Err())
 			continue
 		}
 
 		// add nat rule
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client NAT rule")
 		if err = s.addNATRule(getClientID(client.UserID, client.GroupID), client.Address, client.AllowedIPs); err != nil {
-			errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client NAT rule").Raise())
+			errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client NAT rule").Err())
 			continue
 		}
 
@@ -505,7 +505,7 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Bool("banned", client.Banned).Msg("Adding client blocking rule if user is banned")
 		if client.Banned {
 			if err = s.addBlockRule(getClientID(client.UserID, client.GroupID), client.Address); err != nil {
-				errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client blocking rule").Raise())
+				errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to add client blocking rule").Err())
 				continue
 			}
 		}
@@ -515,7 +515,7 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 	}
 
 	if errs != nil {
-		return appError.ErrPlatform.WithError(errs).WithMessage("Failed to create clients").Raise()
+		return appError.ErrPlatform.WithError(errs).WithMessage("Failed to create clients").Err()
 	}
 
 	log.Debug().Msg("Clients created")

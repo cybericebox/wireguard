@@ -46,12 +46,12 @@ func newPostgresDB(ctx context.Context, cfg *config.PostgresConfig) (*pgxpool.Po
 		fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s", cfg.Username, cfg.Password, cfg.Database, cfg.Host, cfg.Port, cfg.SSLMode))
 	conn, err := pgxpool.NewWithConfig(ctx, ConnConfig)
 	if err != nil {
-		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Raise()
+		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Err()
 	}
 
 	// ping db
 	if err = conn.Ping(ctx); err != nil {
-		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to ping db").Raise()
+		return nil, appError.ErrPostgres.WithError(err).WithMessage("Failed to ping db").Err()
 	}
 
 	return conn, nil
@@ -73,7 +73,7 @@ func runMigrations(cfg *config.PostgresConfig) error {
 		DatabaseName:    cfg.Database,
 	})
 	if err != nil {
-		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Raise()
+		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create new postgres db connection").Err()
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
@@ -83,12 +83,12 @@ func runMigrations(cfg *config.PostgresConfig) error {
 	)
 
 	if err != nil {
-		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create migration driver").Raise()
+		return appError.ErrPostgres.WithError(err).WithMessage("Failed to create migration driver").Err()
 	}
 
 	if err = m.Up(); err != nil {
 		if !errors.Is(migrate.ErrNoChange, err) {
-			return appError.ErrPostgres.WithError(err).WithMessage("Failed to run migrations").Raise()
+			return appError.ErrPostgres.WithError(err).WithMessage("Failed to run migrations").Err()
 		}
 	}
 	return nil

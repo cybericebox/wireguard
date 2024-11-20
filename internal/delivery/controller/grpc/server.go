@@ -27,20 +27,20 @@ func getCredentials(conf *config.TLSConfig) (credentials.TransportCredentials, e
 
 	certificate, err := tls.LoadX509KeyPair(conf.CertFile, conf.CertKey)
 	if err != nil {
-		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to load certificates").Raise()
+		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to load certificates").Err()
 	}
 
 	// Create a certificate pool from the certificate authority
 	certPool := x509.NewCertPool()
 	ca, err := os.ReadFile(conf.CAFile)
 	if err != nil {
-		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to read CA file").Raise()
+		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to read CA file").Err()
 	}
 	// CA file for let's encrypt is located under domain conf as `chain.pem`
 	// pass chain.pem location
 	// Append the client certificates from the CA
 	if ok := certPool.AppendCertsFromPEM(ca); !ok {
-		return nil, appError.ErrGRPC.WithMessage("Failed to append client certificates").Raise()
+		return nil, appError.ErrGRPC.WithMessage("Failed to append client certificates").Err()
 	}
 
 	// Create the TLS credentials
@@ -58,7 +58,7 @@ func secureConn(conf *config.TLSConfig) ([]grpc.ServerOption, error) {
 		log.Debug().Msgf("Conf cert-file: %s, cert-key: %s ca: %s", conf.CertFile, conf.CertKey, conf.CAFile)
 		creds, err := getCredentials(conf)
 		if err != nil {
-			return []grpc.ServerOption{}, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Raise()
+			return []grpc.ServerOption{}, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Err()
 		}
 
 		log.Debug().Msg("Server is running in secure mode!")
@@ -75,7 +75,7 @@ func New(conf *config.GRPCConfig, wgService Service) (*grpc.Server, error) {
 	}
 	opts, err := secureConn(&conf.TLS)
 	if err != nil {
-		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get secure connection").Raise()
+		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get secure connection").Err()
 	}
 
 	gRPCEndpoint := gRPCServer.addAuth(opts...)
@@ -90,14 +90,14 @@ func New(conf *config.GRPCConfig, wgService Service) (*grpc.Server, error) {
 func (w *Wireguard) addAuth(opts ...grpc.ServerOption) *grpc.Server {
 	streamInterceptor := func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if err := w.auth.AuthenticateContext(stream.Context()); err != nil {
-			return appError.ErrGRPC.WithError(err).WithMessage("Failed to authenticate context").Raise()
+			return appError.ErrGRPC.WithError(err).WithMessage("Failed to authenticate context").Err()
 		}
 		return handler(srv, stream)
 	}
 
 	unaryInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if err := w.auth.AuthenticateContext(ctx); err != nil {
-			return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to authenticate context").Raise()
+			return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to authenticate context").Err()
 		}
 		return handler(ctx, req)
 	}
