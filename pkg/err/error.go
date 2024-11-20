@@ -34,7 +34,6 @@ type (
 		WithWrappedError(errCreator ErrorCreator) ErrorCreator
 		WithContext(key string, value interface{}) ErrorCreator
 		WithCode(code Code) ErrorCreator
-		Raise() Error
 		Err() Error
 	}
 )
@@ -125,12 +124,8 @@ func (e appError) WithWrappedError(errCreator ErrorCreator) ErrorCreator {
 	return e
 }
 
-func (e appError) Raise() Error {
-	return e.saveStack()
-}
-
 func (e appError) Err() Error {
-	return e
+	return e.saveStack()
 }
 
 func (e appError) UnwrapNotInternalError() Error {

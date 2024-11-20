@@ -1,7 +1,10 @@
 package err
 
+import "net/http"
+
 type (
 	code struct {
+		httpCode   int
 		informCode int // for Not Found, Already Exists, etc.
 		objectCode int // for dto
 		detailCode int // for specific error
@@ -15,10 +18,12 @@ type (
 		WithInformCode(informCode int) Code
 		WithObjectCode(objectCode int) Code
 		WithDetailCode(detailCode int) Code
+		WithHTTPCode(httpCode int) Code
 		Code() int
+		InformCode() int
 		ObjectCode() int
 		DetailCode() int
-		InformCode() int
+		HTTPCode() int
 		Message() string
 		Details() map[string]interface{}
 		Is(code Code) bool
@@ -34,6 +39,7 @@ type (
 // informCode = platformCodeInternal
 func newCode() Code {
 	return &code{
+		httpCode:   http.StatusInternalServerError,
 		message:    "Internal server error",
 		informCode: platformCodeInternal,
 	}
@@ -64,8 +70,17 @@ func (c code) WithDetailCode(detailCode int) Code {
 	return c
 }
 
+func (c code) WithHTTPCode(httpCode int) Code {
+	c.httpCode = httpCode
+	return c
+}
+
 func (c code) Code() int {
 	return c.informCode*10000 + c.objectCode*100 + c.detailCode
+}
+
+func (c code) InformCode() int {
+	return c.informCode
 }
 
 func (c code) ObjectCode() int {
@@ -76,8 +91,8 @@ func (c code) DetailCode() int {
 	return c.detailCode
 }
 
-func (c code) InformCode() int {
-	return c.informCode
+func (c code) HTTPCode() int {
+	return c.httpCode
 }
 
 func (c code) Message() string {
@@ -133,19 +148,18 @@ const (
 
 // Code constants for categories
 var (
-	codeInternal = newCode()
 	// CodeSuccess has http.StatusOK as default http code
-	codeSuccess = newCode().WithInformCode(platformCodeSuccess).WithMessage("Success")
+	codeSuccess = newCode().WithInformCode(platformCodeSuccess).WithMessage("Success").WithHTTPCode(http.StatusOK)
 	// CodeInvalidData has http.StatusBadRequest as default http code
-	codeInvalidData = newCode().WithInformCode(platformCodeInvalidData).WithMessage("Invalid data")
+	codeInvalidData = newCode().WithInformCode(platformCodeInvalidData).WithMessage("Invalid data").WithHTTPCode(http.StatusBadRequest)
 	// CodeObjectNotFound has http.StatusNotFound as default http code
-	codeObjectNotFound = newCode().WithInformCode(platformCodeObjectNotFound).WithMessage("Object not found")
+	codeObjectNotFound = newCode().WithInformCode(platformCodeObjectNotFound).WithMessage("Object not found").WithHTTPCode(http.StatusNotFound)
 	// CodeUnauthenticated has http.StatusUnauthorized as default http code
-	codeUnauthenticated = newCode().WithInformCode(platformCodeUnauthenticated).WithMessage("Unauthenticated")
+	codeUnauthenticated = newCode().WithInformCode(platformCodeUnauthenticated).WithMessage("Unauthenticated").WithHTTPCode(http.StatusUnauthorized)
 	// CodeForbidden has http.StatusForbidden as default http code
-	codeForbidden = newCode().WithInformCode(platformCodeForbidden).WithMessage("Forbidden")
+	codeForbidden = newCode().WithInformCode(platformCodeForbidden).WithMessage("Forbidden").WithHTTPCode(http.StatusForbidden)
 	// CodeObjectAlreadyExists has http.StatusConflict as default http code
-	codeObjectExists = newCode().WithInformCode(platformCodeObjectExists).WithMessage("Object already exists")
+	codeObjectExists = newCode().WithInformCode(platformCodeObjectExists).WithMessage("Object already exists").WithHTTPCode(http.StatusConflict)
 	// CodeConflict has http.StatusConflict as default http code
-	codeConflict = newCode().WithInformCode(platformCodeConflict).WithMessage("Conflict")
+	codeConflict = newCode().WithInformCode(platformCodeConflict).WithMessage("Conflict").WithHTTPCode(http.StatusConflict)
 )
