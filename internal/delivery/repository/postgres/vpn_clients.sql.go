@@ -7,26 +7,29 @@ package postgres
 
 import (
 	"context"
+	"net/netip"
 
-	"github.com/sqlc-dev/pqtype"
+	"github.com/gofrs/uuid"
 )
 
 const createVpnClient = `-- name: CreateVpnClient :exec
-insert into vpn_clients (id, ip_address, public_key, private_key, laboratory_cidr)
-values ($1, $2, $3, $4, $5)
+insert into vpn_clients (user_id, group_id, ip_address, public_key, private_key, laboratory_cidr)
+values ($1, $2, $3, $4, $5, $6)
 `
 
 type CreateVpnClientParams struct {
-	ID             string      `json:"id"`
-	IpAddress      pqtype.Inet `json:"ip_address"`
-	PublicKey      string      `json:"public_key"`
-	PrivateKey     string      `json:"private_key"`
-	LaboratoryCidr pqtype.Inet `json:"laboratory_cidr"`
+	UserID         uuid.UUID    `json:"user_id"`
+	GroupID        uuid.UUID    `json:"group_id"`
+	IpAddress      netip.Prefix `json:"ip_address"`
+	PublicKey      string       `json:"public_key"`
+	PrivateKey     string       `json:"private_key"`
+	LaboratoryCidr netip.Prefix `json:"laboratory_cidr"`
 }
 
 func (q *Queries) CreateVpnClient(ctx context.Context, arg CreateVpnClientParams) error {
-	_, err := q.exec(ctx, q.createVpnClientStmt, createVpnClient,
-		arg.ID,
+	_, err := q.db.Exec(ctx, createVpnClient,
+		arg.UserID,
+		arg.GroupID,
 		arg.IpAddress,
 		arg.PublicKey,
 		arg.PrivateKey,
@@ -35,19 +38,29 @@ func (q *Queries) CreateVpnClient(ctx context.Context, arg CreateVpnClientParams
 	return err
 }
 
-const deleteVPNClient = `-- name: DeleteVPNClient :exec
+const deleteVPNClients = `-- name: DeleteVPNClients :execrows
 delete
 from vpn_clients
-where id = $1
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id)
 `
 
-func (q *Queries) DeleteVPNClient(ctx context.Context, id string) error {
-	_, err := q.exec(ctx, q.deleteVPNClientStmt, deleteVPNClient, id)
-	return err
+type DeleteVPNClientsParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) DeleteVPNClients(ctx context.Context, arg DeleteVPNClientsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteVPNClients, arg.UserID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getVPNClients = `-- name: GetVPNClients :many
-select id,
+select user_id,
+       group_id,
        ip_address,
        public_key,
        private_key,
@@ -59,7 +72,7 @@ from vpn_clients
 `
 
 func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
-	rows, err := q.query(ctx, q.getVPNClientsStmt, getVPNClients)
+	rows, err := q.db.Query(ctx, getVPNClients)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +81,8 @@ func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
 	for rows.Next() {
 		var i VpnClient
 		if err := rows.Scan(
-			&i.ID,
+			&i.UserID,
+			&i.GroupID,
 			&i.IpAddress,
 			&i.PublicKey,
 			&i.PrivateKey,
@@ -81,27 +95,30 @@ func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
-const updateVPNClientBanStatus = `-- name: UpdateVPNClientBanStatus :exec
+const updateVPNClientsBanStatus = `-- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
-set banned = $2
-where id = $1
+set banned     = $3,
+    updated_at = now()
+where user_id = coalesce($1, user_id)
+  and group_id = coalesce($2, group_id)
 `
 
-type UpdateVPNClientBanStatusParams struct {
-	ID     string `json:"id"`
-	Banned bool   `json:"banned"`
+type UpdateVPNClientsBanStatusParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	GroupID uuid.UUID `json:"group_id"`
+	Banned  bool      `json:"banned"`
 }
 
-func (q *Queries) UpdateVPNClientBanStatus(ctx context.Context, arg UpdateVPNClientBanStatusParams) error {
-	_, err := q.exec(ctx, q.updateVPNClientBanStatusStmt, updateVPNClientBanStatus, arg.ID, arg.Banned)
-	return err
+func (q *Queries) UpdateVPNClientsBanStatus(ctx context.Context, arg UpdateVPNClientsBanStatusParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateVPNClientsBanStatus, arg.UserID, arg.GroupID, arg.Banned)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

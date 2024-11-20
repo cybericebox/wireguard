@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/cybericebox/wireguard/internal/config"
 	grpcController "github.com/cybericebox/wireguard/internal/delivery/controller/grpc"
 	"github.com/rs/zerolog/log"
@@ -44,7 +45,7 @@ func NewController(deps Dependencies) *Controller {
 
 // Start starts the controller
 func (c *Controller) Start() {
-	lis, err := net.Listen("tcp", c.config.GRPC.Endpoint)
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", c.config.GRPC.Host, c.config.GRPC.Port))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to listen")
 	}
@@ -53,7 +54,7 @@ func (c *Controller) Start() {
 			log.Fatal().Err(err).Msg("failed to serve")
 		}
 	}()
-	log.Info().Msgf("gRPC server is running at %s...\n", c.config.GRPC.Endpoint)
+	log.Info().Msgf("gRPC server is running at %s...\n", fmt.Sprintf("%s:%s", c.config.GRPC.Host, c.config.GRPC.Port))
 }
 
 // Stop stops the controller

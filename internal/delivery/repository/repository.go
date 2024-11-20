@@ -20,3 +20,7 @@ func NewRepository(deps Dependencies) *Repository {
 		postgres.NewRepository(&deps.Config.Postgres),
 	}
 }
+
+func (r *Repository) Close() {
+	r.PostgresRepository.Close()
+}

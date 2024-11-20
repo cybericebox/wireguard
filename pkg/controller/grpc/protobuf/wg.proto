@@ -7,22 +7,28 @@ service Wireguard {
   rpc Ping(EmptyRequest) returns (EmptyResponse) {}
 
   rpc GetClientConfig(ClientConfigRequest) returns (ConfigResponse) {}
-  rpc DeleteClient(ClientRequest) returns (EmptyResponse) {}
+  rpc DeleteClients(ClientsRequest) returns (ClientsResponse) {}
 
-  rpc BanClient(ClientRequest) returns (EmptyResponse) {}
-  rpc UnBanClient(ClientRequest) returns (EmptyResponse) {}
+  rpc BanClients(ClientsRequest) returns (ClientsResponse) {}
+  rpc UnBanClients(ClientsRequest) returns (ClientsResponse) {}
 }
 message EmptyRequest {}
 
 message EmptyResponse {}
 
-message ClientConfigRequest {
-  string id = 1;
-  string destCIDR = 2;
+message ClientsResponse {
+  int64 clientsAffected = 1;
 }
 
-message ClientRequest {
-  string id = 1;
+message ClientConfigRequest {
+  string userID = 1;
+  string groupID = 2;
+  string destCIDR = 3;
+}
+
+message ClientsRequest {
+  string userID = 1;
+  string groupID = 2;
 }
 
 message ConfigResponse {

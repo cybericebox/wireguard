@@ -21,9 +21,9 @@ const _ = grpc.SupportPackageIsVersion8
 const (
 	Wireguard_Ping_FullMethodName            = "/wireguard.Wireguard/Ping"
 	Wireguard_GetClientConfig_FullMethodName = "/wireguard.Wireguard/GetClientConfig"
-	Wireguard_DeleteClient_FullMethodName    = "/wireguard.Wireguard/DeleteClient"
-	Wireguard_BanClient_FullMethodName       = "/wireguard.Wireguard/BanClient"
-	Wireguard_UnBanClient_FullMethodName     = "/wireguard.Wireguard/UnBanClient"
+	Wireguard_DeleteClients_FullMethodName   = "/wireguard.Wireguard/DeleteClients"
+	Wireguard_BanClients_FullMethodName      = "/wireguard.Wireguard/BanClients"
+	Wireguard_UnBanClients_FullMethodName    = "/wireguard.Wireguard/UnBanClients"
 )
 
 // WireguardClient is the client API for Wireguard service.
@@ -33,9 +33,9 @@ type WireguardClient interface {
 	// metrics
 	Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	GetClientConfig(ctx context.Context, in *ClientConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
-	DeleteClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
-	BanClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
-	UnBanClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
+	BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
+	UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
 }
 
 type wireguardClient struct {
@@ -66,30 +66,30 @@ func (c *wireguardClient) GetClientConfig(ctx context.Context, in *ClientConfigR
 	return out, nil
 }
 
-func (c *wireguardClient) DeleteClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *wireguardClient) DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
-	err := c.cc.Invoke(ctx, Wireguard_DeleteClient_FullMethodName, in, out, cOpts...)
+	out := new(ClientsResponse)
+	err := c.cc.Invoke(ctx, Wireguard_DeleteClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *wireguardClient) BanClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *wireguardClient) BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
-	err := c.cc.Invoke(ctx, Wireguard_BanClient_FullMethodName, in, out, cOpts...)
+	out := new(ClientsResponse)
+	err := c.cc.Invoke(ctx, Wireguard_BanClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *wireguardClient) UnBanClient(ctx context.Context, in *ClientRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *wireguardClient) UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
-	err := c.cc.Invoke(ctx, Wireguard_UnBanClient_FullMethodName, in, out, cOpts...)
+	out := new(ClientsResponse)
+	err := c.cc.Invoke(ctx, Wireguard_UnBanClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +103,9 @@ type WireguardServer interface {
 	// metrics
 	Ping(context.Context, *EmptyRequest) (*EmptyResponse, error)
 	GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error)
-	DeleteClient(context.Context, *ClientRequest) (*EmptyResponse, error)
-	BanClient(context.Context, *ClientRequest) (*EmptyResponse, error)
-	UnBanClient(context.Context, *ClientRequest) (*EmptyResponse, error)
+	DeleteClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
+	BanClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
+	UnBanClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
 	mustEmbedUnimplementedWireguardServer()
 }
 
@@ -119,14 +119,14 @@ func (UnimplementedWireguardServer) Ping(context.Context, *EmptyRequest) (*Empty
 func (UnimplementedWireguardServer) GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClientConfig not implemented")
 }
-func (UnimplementedWireguardServer) DeleteClient(context.Context, *ClientRequest) (*EmptyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteClient not implemented")
+func (UnimplementedWireguardServer) DeleteClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteClients not implemented")
 }
-func (UnimplementedWireguardServer) BanClient(context.Context, *ClientRequest) (*EmptyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BanClient not implemented")
+func (UnimplementedWireguardServer) BanClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BanClients not implemented")
 }
-func (UnimplementedWireguardServer) UnBanClient(context.Context, *ClientRequest) (*EmptyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UnBanClient not implemented")
+func (UnimplementedWireguardServer) UnBanClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnBanClients not implemented")
 }
 func (UnimplementedWireguardServer) mustEmbedUnimplementedWireguardServer() {}
 
@@ -177,56 +177,56 @@ func _Wireguard_GetClientConfig_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Wireguard_DeleteClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClientRequest)
+func _Wireguard_DeleteClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClientsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WireguardServer).DeleteClient(ctx, in)
+		return srv.(WireguardServer).DeleteClients(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Wireguard_DeleteClient_FullMethodName,
+		FullMethod: Wireguard_DeleteClients_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WireguardServer).DeleteClient(ctx, req.(*ClientRequest))
+		return srv.(WireguardServer).DeleteClients(ctx, req.(*ClientsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Wireguard_BanClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClientRequest)
+func _Wireguard_BanClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClientsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WireguardServer).BanClient(ctx, in)
+		return srv.(WireguardServer).BanClients(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Wireguard_BanClient_FullMethodName,
+		FullMethod: Wireguard_BanClients_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WireguardServer).BanClient(ctx, req.(*ClientRequest))
+		return srv.(WireguardServer).BanClients(ctx, req.(*ClientsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Wireguard_UnBanClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClientRequest)
+func _Wireguard_UnBanClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClientsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WireguardServer).UnBanClient(ctx, in)
+		return srv.(WireguardServer).UnBanClients(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Wireguard_UnBanClient_FullMethodName,
+		FullMethod: Wireguard_UnBanClients_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WireguardServer).UnBanClient(ctx, req.(*ClientRequest))
+		return srv.(WireguardServer).UnBanClients(ctx, req.(*ClientsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -247,16 +247,16 @@ var Wireguard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Wireguard_GetClientConfig_Handler,
 		},
 		{
-			MethodName: "DeleteClient",
-			Handler:    _Wireguard_DeleteClient_Handler,
+			MethodName: "DeleteClients",
+			Handler:    _Wireguard_DeleteClients_Handler,
 		},
 		{
-			MethodName: "BanClient",
-			Handler:    _Wireguard_BanClient_Handler,
+			MethodName: "BanClients",
+			Handler:    _Wireguard_BanClients_Handler,
 		},
 		{
-			MethodName: "UnBanClient",
-			Handler:    _Wireguard_UnBanClient_Handler,
+			MethodName: "UnBanClients",
+			Handler:    _Wireguard_UnBanClients_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

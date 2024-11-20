@@ -16,7 +16,7 @@ import (
 
 // Run initializes whole application.
 func Run() {
-	cfg := config.GetConfig()
+	cfg := config.MustGetConfig()
 
 	repo := repository.NewRepository(repository.Dependencies{Config: &cfg.Repository})
 
@@ -25,7 +25,7 @@ func Run() {
 		CIDR:           cfg.Service.VPN.CIDR,
 	})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create IPAManager")
+		log.Fatal().Err(err).Msg("Failed to create IPAManager")
 	}
 
 	keyGen := wg_key_gen.NewKeyGenerator()
@@ -40,11 +40,11 @@ func Run() {
 	ctx := context.Background()
 
 	if err = wgService.InitServer(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to init server")
+		log.Fatal().Err(err).Msg("Failed to init server")
 	}
 
-	if err = wgService.InitServerUsers(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to init server users")
+	if err = wgService.InitServerClients(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Failed to init server users")
 	}
 
 	ctrl := controller.NewController(controller.Dependencies{
@@ -55,8 +55,10 @@ func Run() {
 	ctrl.Start()
 
 	if _, err = os.Create("/ready"); err != nil {
-		log.Fatal().Err(err).Msg("failed to create ready file")
+		log.Fatal().Err(err).Msg("Failed to create ready file")
 	}
+
+	log.Info().Msg("Application started")
 
 	// Graceful Shutdown
 	quit := make(chan os.Signal, 1)
@@ -64,5 +66,12 @@ func Run() {
 
 	<-quit
 
+	// Stop the controller
 	ctrl.Stop()
+	log.Info().Msg("Controller stopped")
+	// Stop the repository
+	repo.Close()
+	log.Info().Msg("Repository closed")
+
+	log.Info().Msg("Application stopped")
 }

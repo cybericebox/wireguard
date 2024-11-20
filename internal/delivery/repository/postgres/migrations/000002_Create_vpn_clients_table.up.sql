@@ -1,11 +1,14 @@
 create table if not exists vpn_clients
 (
-    id varchar(74) primary key,
+    user_id         uuid not null,
+    group_id        uuid not null,
 
-    ip_address      inet        not null unique,
+    primary key (user_id, group_id),
+
+    ip_address      cidr not null unique,
     public_key      varchar(44) not null unique,
     private_key     varchar(44) not null unique,
-    laboratory_cidr inet        not null,
+    laboratory_cidr cidr not null,
 
     banned          boolean     not null default false,
 

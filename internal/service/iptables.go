@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"github.com/cybericebox/wireguard/pkg/appError"
 	"github.com/rs/zerolog/log"
 	"os/exec"
 )
@@ -17,7 +18,7 @@ func (s *Service) addNATRule(id, ip, destCidr string) error {
 	log.Debug().Str("command", command).Msg("Adding NAT rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return fmt.Errorf("adding NAT rule error: [%w]", err)
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to add NAT rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -28,7 +29,7 @@ func (s *Service) deleteNATRule(id, ip, destCidr string) error {
 	log.Debug().Str("command", command).Msg("Deleting NAT rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return fmt.Errorf("deleting NAT rule error: [%w]", err)
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete NAT rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -39,7 +40,7 @@ func (s *Service) addBlockRule(id, ip string) error {
 	log.Debug().Str("command", command).Msg("Adding blocking rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return fmt.Errorf("adding blocking rule error: [%w]", err)
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to add blocking rule").WithContext("command", command).Err()
 	}
 	return nil
 }
@@ -50,7 +51,7 @@ func (s *Service) deleteBlockRule(id, ip string) error {
 	log.Debug().Str("command", command).Msg("Deleting blocking rule")
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
-		return fmt.Errorf("deleting blocking rule error: [%w]", err)
+		return appError.ErrIptables.WithError(err).WithMessage("Failed to delete blocking rule").WithContext("command", command).Err()
 	}
 	return nil
 }
