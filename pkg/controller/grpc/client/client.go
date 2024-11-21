@@ -18,27 +18,40 @@ const (
 	AuthKey            = "authKey"
 )
 
-type Credentials struct {
-	Token    string
-	Insecure bool
-}
-type Config struct {
-	Endpoint string
-	Auth     Auth
-	TLS      TLS
-}
+type (
+	Credentials struct {
+		Token    string
+		Insecure bool
+	}
 
-type Auth struct {
-	AuthKey string
-	SignKey string
-}
+	Config struct {
+		Endpoint string
+		Auth     Auth
+		TLS      TLS
+	}
 
-type TLS struct {
-	Enabled  bool
-	CertFile string
-	CertKey  string
-	CaFile   string
-}
+	Auth struct {
+		AuthKey string
+		SignKey string
+	}
+
+	TLS struct {
+		Enabled  bool
+		CertFile string
+		CertKey  string
+		CaFile   string
+	}
+
+	WireguardClient interface {
+		Close() error
+		protobuf.WireguardClient
+	}
+
+	wireguardClient struct {
+		protobuf.WireguardClient
+		connection *grpc.ClientConn
+	}
+)
 
 func (c Credentials) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
 	return map[string]string{
@@ -95,16 +108,16 @@ func constructAuthCredentials(authKey, signKey string) (Credentials, error) {
 }
 
 // NewWireguardConnection creates a new connection to the wireguard service and returns the client and a function to close the connection
-func NewWireguardConnection(config Config) (protobuf.WireguardClient, func() error, error) {
+func NewWireguardConnection(config Config) (WireguardClient, error) {
 	log.Debug().Str("url", config.Endpoint).Msg("Connecting to wireguard")
 
 	authCreds, err := constructAuthCredentials(config.Auth.AuthKey, config.Auth.SignKey)
 	if err != nil {
-		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to construct auth credentials").Err()
+		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to construct auth credentials").Err()
 	}
 	creds, err := getCredentials(config.TLS)
 	if err != nil {
-		return nil, nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Err()
+		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get credentials").Err()
 	}
 	var dialOpts []grpc.DialOption
 	if config.TLS.Enabled {
@@ -123,10 +136,23 @@ func NewWireguardConnection(config Config) (protobuf.WireguardClient, func() err
 
 	conn, err := grpc.NewClient(config.Endpoint, dialOpts...)
 	if err != nil {
-		return nil, nil, translateRPCErr(err)
+		return nil, translateRPCErr(err)
 	}
 
-	client := protobuf.NewWireguardClient(conn)
+	c := protobuf.NewWireguardClient(conn)
 
-	return client, conn.Close, nil
+	client := &wireguardClient{
+		WireguardClient: c,
+		connection:      conn,
+	}
+
+	return client, nil
+}
+
+func (c *wireguardClient) Close() error {
+	if c.connection.Close() != nil {
+		return appError.ErrGRPC.WithMessage("Failed to close connection").Err()
+	}
+
+	return nil
 }

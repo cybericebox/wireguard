@@ -17,37 +17,37 @@ service Wireguard {
 message EmptyRequest {}
 
 message ClientsRequest {
-  string userID = 1;
-  string groupID = 2;
+  string UserID = 1;
+  string GroupID = 2;
 }
 
 message ClientConfigRequest {
-  string userID = 1;
-  string groupID = 2;
-  string destCIDR = 3;
+  string UserID = 1;
+  string GroupID = 2;
+  string DestCIDR = 3;
 }
 
 message EmptyResponse {}
 
 message MonitoringResponse {
-  repeated Client clients = 1;
+  repeated Client Clients = 1;
 }
 
 message ClientsResponse {
-  repeated Client clients = 1;
+  repeated Client Clients = 1;
 }
 
 message ConfigResponse {
-  string config = 1;
+  string Config = 1;
 }
 
 message ClientsAffectedResponse {
-  int64 clientsAffected = 1;
+  int64 ClientsAffected = 1;
 }
 
 message Client {
-  string userID = 1;
-  string groupID = 2;
-  bool banned = 3;
-  int64 lastSeen = 4;
+  string UserID = 1;
+  string GroupID = 2;
+  bool Banned = 3;
+  int64 LastSeen = 4;
 }
