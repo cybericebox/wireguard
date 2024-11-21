@@ -30,6 +30,7 @@ type (
 		WithObjectCode(objectCode int) ErrorCreator
 		WithDetailCode(detailCode int) ErrorCreator
 		WithMessage(message string) ErrorCreator
+		WithMessageF(format string, a ...any) ErrorCreator
 		WithError(err error) ErrorCreator
 		WithWrappedError(errCreator ErrorCreator) ErrorCreator
 		WithContext(key string, value interface{}) ErrorCreator
@@ -97,6 +98,12 @@ func (e appError) WithDetailCode(detailCode int) ErrorCreator {
 
 func (e appError) WithMessage(message string) ErrorCreator {
 	e.code = e.code.WithMessage(message)
+
+	return e
+}
+
+func (e appError) WithMessageF(format string, a ...any) ErrorCreator {
+	e.code = e.code.WithMessage(fmt.Sprintf(format, a...))
 
 	return e
 }
