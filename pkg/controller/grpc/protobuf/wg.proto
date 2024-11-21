@@ -5,19 +5,20 @@ option go_package = "github.com/cybericebox/wireguard/pkg/controller/grpc/protob
 service Wireguard {
   // metrics
   rpc Ping(EmptyRequest) returns (EmptyResponse) {}
+  rpc Monitoring(stream EmptyRequest) returns (stream MonitoringResponse) {}
 
+  rpc GetClients(ClientsRequest) returns (ClientsResponse) {}
   rpc GetClientConfig(ClientConfigRequest) returns (ConfigResponse) {}
-  rpc DeleteClients(ClientsRequest) returns (ClientsResponse) {}
+  rpc DeleteClients(ClientsRequest) returns (ClientsAffectedResponse) {}
 
-  rpc BanClients(ClientsRequest) returns (ClientsResponse) {}
-  rpc UnBanClients(ClientsRequest) returns (ClientsResponse) {}
+  rpc BanClients(ClientsRequest) returns (ClientsAffectedResponse) {}
+  rpc UnBanClients(ClientsRequest) returns (ClientsAffectedResponse) {}
 }
 message EmptyRequest {}
 
-message EmptyResponse {}
-
-message ClientsResponse {
-  int64 clientsAffected = 1;
+message ClientsRequest {
+  string userID = 1;
+  string groupID = 2;
 }
 
 message ClientConfigRequest {
@@ -26,11 +27,27 @@ message ClientConfigRequest {
   string destCIDR = 3;
 }
 
-message ClientsRequest {
-  string userID = 1;
-  string groupID = 2;
+message EmptyResponse {}
+
+message MonitoringResponse {
+  repeated Client clients = 1;
+}
+
+message ClientsResponse {
+  repeated Client clients = 1;
 }
 
 message ConfigResponse {
   string config = 1;
+}
+
+message ClientsAffectedResponse {
+  int64 clientsAffected = 1;
+}
+
+message Client {
+  string userID = 1;
+  string groupID = 2;
+  bool banned = 3;
+  int64 lastSeen = 4;
 }

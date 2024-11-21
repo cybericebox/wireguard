@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion8
 
 const (
 	Wireguard_Ping_FullMethodName            = "/wireguard.Wireguard/Ping"
+	Wireguard_Monitoring_FullMethodName      = "/wireguard.Wireguard/Monitoring"
+	Wireguard_GetClients_FullMethodName      = "/wireguard.Wireguard/GetClients"
 	Wireguard_GetClientConfig_FullMethodName = "/wireguard.Wireguard/GetClientConfig"
 	Wireguard_DeleteClients_FullMethodName   = "/wireguard.Wireguard/DeleteClients"
 	Wireguard_BanClients_FullMethodName      = "/wireguard.Wireguard/BanClients"
@@ -32,10 +34,12 @@ const (
 type WireguardClient interface {
 	// metrics
 	Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Monitoring(ctx context.Context, opts ...grpc.CallOption) (Wireguard_MonitoringClient, error)
+	GetClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
 	GetClientConfig(ctx context.Context, in *ClientConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
-	DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
-	BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
-	UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error)
+	DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error)
+	BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error)
+	UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error)
 }
 
 type wireguardClient struct {
@@ -56,6 +60,48 @@ func (c *wireguardClient) Ping(ctx context.Context, in *EmptyRequest, opts ...gr
 	return out, nil
 }
 
+func (c *wireguardClient) Monitoring(ctx context.Context, opts ...grpc.CallOption) (Wireguard_MonitoringClient, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Wireguard_ServiceDesc.Streams[0], Wireguard_Monitoring_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &wireguardMonitoringClient{ClientStream: stream}
+	return x, nil
+}
+
+type Wireguard_MonitoringClient interface {
+	Send(*EmptyRequest) error
+	Recv() (*MonitoringResponse, error)
+	grpc.ClientStream
+}
+
+type wireguardMonitoringClient struct {
+	grpc.ClientStream
+}
+
+func (x *wireguardMonitoringClient) Send(m *EmptyRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *wireguardMonitoringClient) Recv() (*MonitoringResponse, error) {
+	m := new(MonitoringResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *wireguardClient) GetClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClientsResponse)
+	err := c.cc.Invoke(ctx, Wireguard_GetClients_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *wireguardClient) GetClientConfig(ctx context.Context, in *ClientConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConfigResponse)
@@ -66,9 +112,9 @@ func (c *wireguardClient) GetClientConfig(ctx context.Context, in *ClientConfigR
 	return out, nil
 }
 
-func (c *wireguardClient) DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
+func (c *wireguardClient) DeleteClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ClientsResponse)
+	out := new(ClientsAffectedResponse)
 	err := c.cc.Invoke(ctx, Wireguard_DeleteClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -76,9 +122,9 @@ func (c *wireguardClient) DeleteClients(ctx context.Context, in *ClientsRequest,
 	return out, nil
 }
 
-func (c *wireguardClient) BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
+func (c *wireguardClient) BanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ClientsResponse)
+	out := new(ClientsAffectedResponse)
 	err := c.cc.Invoke(ctx, Wireguard_BanClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -86,9 +132,9 @@ func (c *wireguardClient) BanClients(ctx context.Context, in *ClientsRequest, op
 	return out, nil
 }
 
-func (c *wireguardClient) UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsResponse, error) {
+func (c *wireguardClient) UnBanClients(ctx context.Context, in *ClientsRequest, opts ...grpc.CallOption) (*ClientsAffectedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ClientsResponse)
+	out := new(ClientsAffectedResponse)
 	err := c.cc.Invoke(ctx, Wireguard_UnBanClients_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -102,10 +148,12 @@ func (c *wireguardClient) UnBanClients(ctx context.Context, in *ClientsRequest, 
 type WireguardServer interface {
 	// metrics
 	Ping(context.Context, *EmptyRequest) (*EmptyResponse, error)
+	Monitoring(Wireguard_MonitoringServer) error
+	GetClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
 	GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error)
-	DeleteClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
-	BanClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
-	UnBanClients(context.Context, *ClientsRequest) (*ClientsResponse, error)
+	DeleteClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error)
+	BanClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error)
+	UnBanClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error)
 	mustEmbedUnimplementedWireguardServer()
 }
 
@@ -116,16 +164,22 @@ type UnimplementedWireguardServer struct {
 func (UnimplementedWireguardServer) Ping(context.Context, *EmptyRequest) (*EmptyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
+func (UnimplementedWireguardServer) Monitoring(Wireguard_MonitoringServer) error {
+	return status.Errorf(codes.Unimplemented, "method Monitoring not implemented")
+}
+func (UnimplementedWireguardServer) GetClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetClients not implemented")
+}
 func (UnimplementedWireguardServer) GetClientConfig(context.Context, *ClientConfigRequest) (*ConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClientConfig not implemented")
 }
-func (UnimplementedWireguardServer) DeleteClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+func (UnimplementedWireguardServer) DeleteClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteClients not implemented")
 }
-func (UnimplementedWireguardServer) BanClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+func (UnimplementedWireguardServer) BanClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BanClients not implemented")
 }
-func (UnimplementedWireguardServer) UnBanClients(context.Context, *ClientsRequest) (*ClientsResponse, error) {
+func (UnimplementedWireguardServer) UnBanClients(context.Context, *ClientsRequest) (*ClientsAffectedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnBanClients not implemented")
 }
 func (UnimplementedWireguardServer) mustEmbedUnimplementedWireguardServer() {}
@@ -155,6 +209,50 @@ func _Wireguard_Ping_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(WireguardServer).Ping(ctx, req.(*EmptyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Wireguard_Monitoring_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(WireguardServer).Monitoring(&wireguardMonitoringServer{ServerStream: stream})
+}
+
+type Wireguard_MonitoringServer interface {
+	Send(*MonitoringResponse) error
+	Recv() (*EmptyRequest, error)
+	grpc.ServerStream
+}
+
+type wireguardMonitoringServer struct {
+	grpc.ServerStream
+}
+
+func (x *wireguardMonitoringServer) Send(m *MonitoringResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *wireguardMonitoringServer) Recv() (*EmptyRequest, error) {
+	m := new(EmptyRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _Wireguard_GetClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClientsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WireguardServer).GetClients(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Wireguard_GetClients_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WireguardServer).GetClients(ctx, req.(*ClientsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -243,6 +341,10 @@ var Wireguard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Wireguard_Ping_Handler,
 		},
 		{
+			MethodName: "GetClients",
+			Handler:    _Wireguard_GetClients_Handler,
+		},
+		{
 			MethodName: "GetClientConfig",
 			Handler:    _Wireguard_GetClientConfig_Handler,
 		},
@@ -259,6 +361,13 @@ var Wireguard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Wireguard_UnBanClients_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Monitoring",
+			Handler:       _Wireguard_Monitoring_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "wg.proto",
 }

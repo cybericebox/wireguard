@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"text/template"
 )
 
@@ -40,6 +42,41 @@ Endpoint = {{.Endpoint}}
 PersistentKeepalive = 25
 `
 )
+
+// getPeersLastHandshake returns a map of peers with their last handshake time in seconds map[publicKey]lastHandshake
+func (s *Service) getPeersLastHandshake() (map[string]int, error) {
+	command := fmt.Sprintf("%s show %s dump", wgManageBin, nic)
+
+	log.Debug().Str("command", command).Msg("Getting peers")
+
+	out, err := exec.Command("/bin/sh", "-c", command).Output()
+	if err != nil {
+		return nil, appError.ErrWireguard.WithError(err).WithMessage("Failed to get peers").WithContext("command", command).Err()
+	}
+
+	peers := make(map[string]int)
+	var errs error
+
+	for _, line := range strings.Split(string(out), "\n")[1:] {
+		parts := strings.Fields(line)
+		if len(parts) != 8 {
+			continue
+		}
+
+		lastHandshake, err := strconv.Atoi(parts[4])
+		if err != nil {
+			errs = appError.ErrWireguard.WithError(err).WithMessage("Failed to convert last handshake").WithContext("lastHandshake", parts[4]).Err()
+			continue
+		}
+		peers[parts[1]] = lastHandshake
+	}
+
+	if errs != nil {
+		return nil, appError.ErrWireguard.WithError(errs).WithMessage("Failed to get peers").Err()
+	}
+
+	return peers, nil
+}
 
 func (s *Service) addPeer(ip, publicKey string) error {
 	log.Debug().Msgf("Peer with publickey [ %s ] is adding to %s", publicKey, ip)
@@ -80,6 +117,31 @@ func (s *Service) deletePeer(ip, publicKey string) error {
 
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
 		return appError.ErrWireguard.WithError(err).WithMessage("Failed to delete route").WithContext("command", command).Err()
+	}
+
+	return nil
+}
+
+func (s *Service) createServerConfig() error {
+	config, err := s.generateServerConfig()
+	if err != nil {
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to generate server config").Err()
+	}
+
+	if err = writeToFile(fmt.Sprintf("%s/%s.conf", configPath, nic), config); err != nil {
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to write server config").Err()
+	}
+
+	return nil
+}
+
+func (s *Service) createServer() error {
+	if err := s.createServerConfig(); err != nil {
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to create server").Err()
+	}
+
+	if err := upInterface(); err != nil {
+		return appError.ErrWireguard.WithError(err).WithMessage("Failed to up interface").Err()
 	}
 
 	return nil
@@ -131,7 +193,7 @@ func writeToFile(filename string, data string) error {
 	}
 	defer func() {
 		if err = file.Close(); err != nil {
-			log.Fatal().Err(err).Msg("failed to close file")
+			log.Fatal().Err(err).Msg("Failed to close file")
 		}
 	}()
 

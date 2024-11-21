@@ -13,5 +13,6 @@ type (
 		AllowedIPs string
 		Endpoint   string
 		Banned     bool
+		LastSeen   int64
 	}
 )

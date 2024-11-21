@@ -20,8 +20,8 @@ type (
 	// Service is the API for the service layer
 	Service interface {
 
-		// Service is dependencies for the grpc controller
-		grpcController.Service
+		// IService is dependencies for the grpc controller
+		grpcController.IService
 	}
 
 	// Dependencies for the controller
@@ -33,9 +33,12 @@ type (
 
 // NewController creates a new controller
 func NewController(deps Dependencies) *Controller {
-	grpcCont, err := grpcController.New(&deps.Config.GRPC, deps.Service)
+	grpcCont, err := grpcController.New(grpcController.Dependencies{
+		Config:  &deps.Config.GRPC,
+		Service: deps.Service,
+	})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to setup grpc server")
+		log.Fatal().Err(err).Msg("Failed to setup grpc server")
 	}
 	return &Controller{
 		grpcController: grpcCont,
@@ -47,11 +50,11 @@ func NewController(deps Dependencies) *Controller {
 func (c *Controller) Start() {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", c.config.GRPC.Host, c.config.GRPC.Port))
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to listen")
+		log.Fatal().Err(err).Msg("Failed to listen")
 	}
 	go func() {
 		if err = c.grpcController.Serve(lis); err != nil {
-			log.Fatal().Err(err).Msg("failed to serve")
+			log.Fatal().Err(err).Msg("Failed to serve")
 		}
 	}()
 	log.Info().Msgf("gRPC server is running at %s...\n", fmt.Sprintf("%s:%s", c.config.GRPC.Host, c.config.GRPC.Port))

@@ -15,9 +15,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
 	"net/netip"
-	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 type (
@@ -71,6 +71,29 @@ func NewService(deps Dependencies) *Service {
 
 func getClientID(userID, groupID uuid.UUID) string {
 	return fmt.Sprintf("%s-%s", userID, groupID)
+}
+
+func (s *Service) GetClients(_ context.Context, userID, groupID uuid.UUID) ([]*model.Client, error) {
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Getting clients")
+	clients := s.getFilteredClients(userID, groupID, nil)
+
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients")
+	peers, err := s.getPeersLastHandshake()
+	if err != nil {
+		return nil, appError.ErrClient.WithError(err).WithMessage("Failed to get peers last handshake").Err()
+	}
+
+	for _, c := range clients {
+		if lastHandshake, ok := peers[c.PublicKey]; ok {
+			c.LastSeen = -1
+			if lastHandshake > 0 {
+				c.LastSeen = time.Now().Unix() - int64(lastHandshake)
+			}
+		}
+	}
+
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients")
+	return clients, nil
 }
 
 func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID, destCIDR string) (string, error) {
@@ -436,20 +459,9 @@ func (s *Service) InitServer(ctx context.Context) error {
 		}
 	}
 
-	log.Debug().Msg("Generating server config")
-	strConfig, err := s.generateServerConfig()
-	if err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server config").Err()
-	}
-
-	log.Debug().Msg("Writing server config to file")
-	if err = writeToFile(path.Join(configPath, nic+".conf"), strConfig); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to write server config to file").Err()
-	}
-
-	log.Debug().Msg("Creating wireguard interface")
-	if err = upInterface(); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create wireguard interface").Err()
+	log.Debug().Msg("Create server")
+	if err = s.createServer(); err != nil {
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create server").Err()
 	}
 
 	log.Debug().Str("Address: ", s.config.Address).
