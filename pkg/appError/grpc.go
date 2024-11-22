@@ -1,6 +1,6 @@
 package appError
 
-import "github.com/cybericebox/wireguard/pkg/err"
+import "github.com/cybericebox/lib/pkg/err"
 
 var (
 	ErrGRPC = err.ErrInternal.WithObjectCode(gRPCObjectCode)

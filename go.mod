@@ -1,8 +1,11 @@
 module github.com/cybericebox/wireguard
 
-go 1.23.1
+go 1.23.2
+
+toolchain go1.23.3
 
 require (
+	github.com/cybericebox/lib v1.0.0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-migrate/migrate/v4 v4.18.1
@@ -10,9 +13,7 @@ require (
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/lib/pq v1.10.9
-	github.com/metal-stack/go-ipam v1.14.7
 	github.com/rs/zerolog v1.33.0
-	golang.org/x/crypto v0.29.0
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
 )
@@ -37,6 +38,7 @@ require (
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/metal-stack/go-ipam v1.14.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -51,6 +53,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
+	golang.org/x/crypto v0.29.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect

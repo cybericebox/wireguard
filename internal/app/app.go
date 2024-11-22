@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
+	"github.com/cybericebox/lib/pkg/ipam"
+	"github.com/cybericebox/lib/pkg/wgKeyGen"
 	"github.com/cybericebox/wireguard/internal/config"
 	"github.com/cybericebox/wireguard/internal/delivery/controller"
 	"github.com/cybericebox/wireguard/internal/delivery/repository"
 	"github.com/cybericebox/wireguard/internal/service"
-	"github.com/cybericebox/wireguard/pkg/ipam"
-	"github.com/cybericebox/wireguard/pkg/wg-key-gen"
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
@@ -28,7 +28,7 @@ func Run() {
 		log.Fatal().Err(err).Msg("Failed to create IPAManager")
 	}
 
-	keyGen := wg_key_gen.NewKeyGenerator()
+	keyGen := wgKeyGen.NewKeyGenerator()
 
 	wgService := service.NewService(service.Dependencies{
 		Repository:   repo,
