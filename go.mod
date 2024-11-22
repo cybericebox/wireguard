@@ -1,8 +1,7 @@
 module github.com/cybericebox/wireguard
 
-go 1.23.2
+go 1.23.3
 
-toolchain go1.23.3
 
 require (
 	github.com/cybericebox/lib v1.0.1
