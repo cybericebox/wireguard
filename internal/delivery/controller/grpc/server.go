@@ -15,12 +15,24 @@ import (
 	"os"
 )
 
-type Wireguard struct {
-	auth    Authenticator
-	config  *config.GRPCConfig
-	service Service
-	protobuf.UnimplementedWireguardServer
-}
+type (
+	Wireguard struct {
+		auth    Authenticator
+		config  *config.GRPCConfig
+		service IService
+		protobuf.UnimplementedWireguardServer
+	}
+
+	Dependencies struct {
+		Config  *config.GRPCConfig
+		Service IService
+	}
+
+	IService interface {
+		IActionsService
+		IMonitoringService
+	}
+)
 
 func getCredentials(conf *config.TLSConfig) (credentials.TransportCredentials, error) {
 	log.Debug().Msg("Preparing credentials for RPC")
@@ -67,13 +79,13 @@ func secureConn(conf *config.TLSConfig) ([]grpc.ServerOption, error) {
 	return []grpc.ServerOption{}, nil
 }
 
-func New(conf *config.GRPCConfig, wgService Service) (*grpc.Server, error) {
+func New(deps Dependencies) (*grpc.Server, error) {
 	gRPCServer := &Wireguard{
-		auth:    NewAuthenticator(conf.Auth.SignKey, conf.Auth.AuthKey),
-		config:  conf,
-		service: wgService,
+		auth:    NewAuthenticator(deps.Config.Auth.SignKey, deps.Config.Auth.AuthKey),
+		config:  deps.Config,
+		service: deps.Service,
 	}
-	opts, err := secureConn(&conf.TLS)
+	opts, err := secureConn(&deps.Config.TLS)
 	if err != nil {
 		return nil, appError.ErrGRPC.WithError(err).WithMessage("Failed to get secure connection").Err()
 	}

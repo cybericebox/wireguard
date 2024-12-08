@@ -1,6 +1,6 @@
 package appError
 
-import "github.com/cybericebox/wireguard/pkg/err"
+import "github.com/cybericebox/lib/pkg/err"
 
 // Object codes
 const (
@@ -9,8 +9,6 @@ const (
 	gRPCObjectCode
 	iptablesObjectCode
 	wireguardObjectCode
-	ipamObjectCode
-	wgKeyGenObjectCode
 	clientObjectCode
 )
 
@@ -20,6 +18,4 @@ var (
 	ErrPostgres  = err.ErrInternal.WithObjectCode(postgresObjectCode)
 	ErrIptables  = err.ErrInternal.WithObjectCode(iptablesObjectCode)
 	ErrWireguard = err.ErrInternal.WithObjectCode(wireguardObjectCode)
-	ErrIPAM      = err.ErrInternal.WithObjectCode(ipamObjectCode)
-	ErrWgKeyGen  = err.ErrInternal.WithObjectCode(wgKeyGenObjectCode)
 )

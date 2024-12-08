@@ -4,20 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cybericebox/lib/pkg/ipam"
+	"github.com/cybericebox/lib/pkg/wgKeyGen"
 	"github.com/cybericebox/wireguard/internal/config"
 	"github.com/cybericebox/wireguard/internal/delivery/repository/postgres"
 	"github.com/cybericebox/wireguard/internal/model"
 	"github.com/cybericebox/wireguard/pkg/appError"
-	"github.com/cybericebox/wireguard/pkg/ipam"
-	"github.com/cybericebox/wireguard/pkg/wg-key-gen"
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
 	"net/netip"
-	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 type (
@@ -25,7 +25,7 @@ type (
 		m            sync.RWMutex
 		config       *config.VPNConfig
 		clients      map[string]*model.Client
-		keyGenerator *wg_key_gen.KeyGenerator
+		keyGenerator *wgKeyGen.KeyGenerator
 		repository   Repository
 		ipaManager   IPAManager
 	}
@@ -54,7 +54,7 @@ type (
 	Dependencies struct {
 		Repository   Repository
 		IPAManager   IPAManager
-		KeyGenerator *wg_key_gen.KeyGenerator
+		KeyGenerator *wgKeyGen.KeyGenerator
 		Config       *config.VPNConfig
 	}
 )
@@ -71,6 +71,29 @@ func NewService(deps Dependencies) *Service {
 
 func getClientID(userID, groupID uuid.UUID) string {
 	return fmt.Sprintf("%s-%s", userID, groupID)
+}
+
+func (s *Service) GetClients(_ context.Context, userID, groupID uuid.UUID) ([]*model.Client, error) {
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Getting clients")
+	clients := s.getFilteredClients(userID, groupID, nil)
+
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients")
+	peers, err := s.getPeersLastHandshake()
+	if err != nil {
+		return nil, appError.ErrClient.WithError(err).WithMessage("Failed to get peers last handshake").Err()
+	}
+
+	for _, c := range clients {
+		if lastHandshake, ok := peers[c.PublicKey]; ok {
+			c.LastSeen = -1
+			if lastHandshake > 0 {
+				c.LastSeen = time.Now().Unix() - int64(lastHandshake)
+			}
+		}
+	}
+
+	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Returning clients")
+	return clients, nil
 }
 
 func (s *Service) GetClientConfig(ctx context.Context, userID, groupID uuid.UUID, destCIDR string) (string, error) {
@@ -182,7 +205,7 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 		// release user address
 		log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Str("address", c.Address).Msg("Releasing client ip")
 		if err := s.ipaManager.ReleaseSingleIP(ctx, addr); err != nil {
-			errs = multierror.Append(errs, appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to release client ip").Err())
+			errs = multierror.Append(errs, appError.ErrClient.WithError(err).WithMessage("Failed to release client ip").Err())
 			continue
 		}
 	}
@@ -318,7 +341,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Acquiring client ip")
 	client.Address, err = s.ipaManager.AcquireSingleIP(ctx)
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to acquire client ip").Err()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to acquire client ip").Err()
 	}
 
 	// add 32 mask to address
@@ -328,7 +351,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client key pair")
 	keys, err := s.keyGenerator.NewKeyPair()
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate client key pair").Err()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to generate client key pair").Err()
 	}
 
 	client.PublicKey, client.PrivateKey = keys.PublicKey, keys.PrivateKey
@@ -372,7 +395,7 @@ func (s *Service) createClient(ctx context.Context, client *model.Client) (err e
 	log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 	client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 	if err != nil {
-		return appError.ErrClient.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to generate client DNS ip").Err()
+		return appError.ErrClient.WithError(err).WithMessage("Failed to generate client DNS ip").Err()
 	}
 
 	s.m.Lock()
@@ -391,13 +414,13 @@ func (s *Service) InitServer(ctx context.Context) error {
 	log.Debug().Msg("Setting server address")
 	s.config.Address, err = s.ipaManager.GetFirstIP()
 	if err != nil {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to get vpn server address").Err()
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to get vpn server address").Err()
 	}
 
 	// reserve server address
 	log.Debug().Str("Address: ", s.config.Address).Msg("Reserving server ip")
 	if _, err = s.ipaManager.AcquireSingleIP(ctx, s.config.Address); err != nil {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrIPAM.WithError(err)).WithMessage("Failed to reserve vpn server address").Err()
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to reserve vpn server address").Err()
 	}
 
 	// get server private key
@@ -420,7 +443,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 		log.Debug().Msg("Key pair does not exist, generating new key pair")
 		keys, err := s.keyGenerator.NewKeyPair()
 		if err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrWgKeyGen.WithError(err)).WithMessage("Failed to generate server key pair").Err()
+			return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server key pair").Err()
 		}
 
 		s.config.PrivateKey, s.config.PublicKey = keys.PrivateKey, keys.PublicKey
@@ -436,20 +459,9 @@ func (s *Service) InitServer(ctx context.Context) error {
 		}
 	}
 
-	log.Debug().Msg("Generating server config")
-	strConfig, err := s.generateServerConfig()
-	if err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server config").Err()
-	}
-
-	log.Debug().Msg("Writing server config to file")
-	if err = writeToFile(path.Join(configPath, nic+".conf"), strConfig); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to write server config to file").Err()
-	}
-
-	log.Debug().Msg("Creating wireguard interface")
-	if err = upInterface(); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create wireguard interface").Err()
+	log.Debug().Msg("Create server")
+	if err = s.createServer(); err != nil {
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to create server").Err()
 	}
 
 	log.Debug().Str("Address: ", s.config.Address).
@@ -485,7 +497,7 @@ func (s *Service) InitServerClients(ctx context.Context) (errs error) {
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Generating client DNS ip")
 		client.DNS, err = ipam.GetFirstCIDRIP(client.AllowedIPs)
 		if err != nil {
-			errs = multierror.Append(errs, appError.ErrPlatform.WithError(appError.ErrIPAM.WithError(err).Err()).WithMessage("Failed to generate client DNS ip").Err())
+			errs = multierror.Append(errs, appError.ErrPlatform.WithError(err).WithMessage("Failed to generate client DNS ip").Err())
 			continue
 		}
 		log.Debug().Str("userID", client.UserID.String()).Str("groupID", client.GroupID.String()).Msg("Adding client peer")
