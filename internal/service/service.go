@@ -216,8 +216,14 @@ func (s *Service) DeleteClients(ctx context.Context, userID, groupID uuid.UUID) 
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Deleting client from db")
 	affected, err := s.repository.DeleteVPNClients(ctx, postgres.DeleteVPNClientsParams{
-		UserID:  userID,
-		GroupID: groupID,
+		UserID: uuid.NullUUID{
+			UUID:  userID,
+			Valid: !userID.IsNil(),
+		},
+		GroupID: uuid.NullUUID{
+			UUID:  groupID,
+			Valid: !groupID.IsNil(),
+		},
 	})
 	if err != nil {
 		return 0, appError.ErrClient.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to delete clients from db").Err()
@@ -263,9 +269,15 @@ func (s *Service) BanClients(ctx context.Context, userID, groupID uuid.UUID) (in
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in db")
 	affected, err := s.repository.UpdateVPNClientsBanStatus(ctx, postgres.UpdateVPNClientsBanStatusParams{
-		UserID:  userID,
-		GroupID: groupID,
-		Banned:  true,
+		UserID: uuid.NullUUID{
+			UUID:  userID,
+			Valid: !userID.IsNil(),
+		},
+		GroupID: uuid.NullUUID{
+			UUID:  groupID,
+			Valid: !groupID.IsNil(),
+		},
+		Banned: true,
 	})
 
 	if err != nil {
@@ -314,9 +326,15 @@ func (s *Service) UnBanClients(ctx context.Context, userID, groupID uuid.UUID) (
 
 	log.Debug().Str("userID", userID.String()).Str("groupID", groupID.String()).Msg("Updating clients ban status in db")
 	affected, err := s.repository.UpdateVPNClientsBanStatus(ctx, postgres.UpdateVPNClientsBanStatusParams{
-		UserID:  userID,
-		GroupID: groupID,
-		Banned:  false,
+		UserID: uuid.NullUUID{
+			UUID:  userID,
+			Valid: !userID.IsNil(),
+		},
+		GroupID: uuid.NullUUID{
+			UUID:  groupID,
+			Valid: !groupID.IsNil(),
+		},
+		Banned: false,
 	})
 
 	if err != nil {

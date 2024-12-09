@@ -16,13 +16,13 @@ from vpn_clients;
 
 -- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
-set banned     = $3,
+set banned = $1,
     updated_at = now()
-where user_id = coalesce($1, user_id)
-  and group_id = coalesce($2, group_id);
+where user_id = coalesce(sqlc.narg(user_id), user_id)
+  and group_id = coalesce(sqlc.narg(group_id), group_id);
 
 -- name: DeleteVPNClients :execrows
 delete
 from vpn_clients
-where user_id = coalesce($1, user_id)
-  and group_id = coalesce($2, group_id);
+where user_id = coalesce(sqlc.narg(user_id), user_id)
+  and group_id = coalesce(sqlc.narg(group_id), group_id);
