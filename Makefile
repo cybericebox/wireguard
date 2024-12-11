@@ -5,7 +5,7 @@ addMigration:
 	migrate create -ext sql -dir internal/delivery/repository/postgres/migrations -seq $(name)
 
 buildAndPush:
-	docker build -f deploy/Dockerfile . -t cybericebox/wireguard:$(tag) && docker push cybericebox/wireguard:$(tag)
+	docker build -f deploy/Dockerfile .  --platform=linux/amd64 -t cybericebox/wireguard:$(tag) && docker push cybericebox/wireguard:$(tag)
 
 protoCompile:
 	docker run --rm -v ./pkg/controller/grpc/protobuf:/app -w /app --platform=linux/amd64 cybericebox/proto-compiler

@@ -46,8 +46,8 @@ where user_id = coalesce($1, user_id)
 `
 
 type DeleteVPNClientsParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	GroupID uuid.UUID `json:"group_id"`
+	UserID  uuid.NullUUID `json:"user_id"`
+	GroupID uuid.NullUUID `json:"group_id"`
 }
 
 func (q *Queries) DeleteVPNClients(ctx context.Context, arg DeleteVPNClientsParams) (int64, error) {
@@ -103,20 +103,20 @@ func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
 
 const updateVPNClientsBanStatus = `-- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
-set banned     = $3,
+set banned     = $1,
     updated_at = now()
-where user_id = coalesce($1, user_id)
-  and group_id = coalesce($2, group_id)
+where user_id = coalesce($2, user_id)
+  and group_id = coalesce($3, group_id)
 `
 
 type UpdateVPNClientsBanStatusParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	GroupID uuid.UUID `json:"group_id"`
-	Banned  bool      `json:"banned"`
+	Banned  bool          `json:"banned"`
+	UserID  uuid.NullUUID `json:"user_id"`
+	GroupID uuid.NullUUID `json:"group_id"`
 }
 
 func (q *Queries) UpdateVPNClientsBanStatus(ctx context.Context, arg UpdateVPNClientsBanStatusParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateVPNClientsBanStatus, arg.UserID, arg.GroupID, arg.Banned)
+	result, err := q.db.Exec(ctx, updateVPNClientsBanStatus, arg.Banned, arg.UserID, arg.GroupID)
 	if err != nil {
 		return 0, err
 	}
