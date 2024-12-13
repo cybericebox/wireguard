@@ -7,19 +7,28 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"os"
 )
 
 const (
-	MigrationPath = "migrations"
-	VPNKeyPair    = "vpn-keypair"
+	VPNKeyPair = "vpn-keypair"
 )
+
+// Environments
+const (
+	Local      = "local"
+	Stage      = "stage"
+	Production = "production"
+)
+
+var MigrationPath string
 
 type (
 	Config struct {
-		Debug      bool             `yaml:"debug" env:"WG_DEBUG" env-default:"false" env-description:"Debug mode"`
-		Controller ControllerConfig `yaml:"controller"`
-		Service    ServiceConfig    `yaml:"service"`
-		Repository RepositoryConfig `yaml:"repository"`
+		Environment string           `yaml:"environment" env:"ENV" env-default:"production" env-description:"Environment"`
+		Controller  ControllerConfig `yaml:"controller"`
+		Service     ServiceConfig    `yaml:"service"`
+		Repository  RepositoryConfig `yaml:"repository"`
 	}
 
 	ControllerConfig struct {
@@ -96,12 +105,21 @@ func MustGetConfig() *Config {
 		return nil
 	}
 
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
 	// set log mode
-	if !instance.Debug {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	} else {
+	if instance.Environment != Production {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
+
+	MigrationPath = "migrations"
+	if instance.Environment == Local {
+		MigrationPath = "internal/delivery/repository/postgres/migrations"
+	}
+
+	// create VPN key pair
+	instance.Service.VPN.KeyPair = &wgKeyGen.KeyPair{}
 
 	return instance
 }

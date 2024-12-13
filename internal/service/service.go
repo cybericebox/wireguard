@@ -41,7 +41,8 @@ type (
 		DeleteVPNClients(ctx context.Context, arg postgres.DeleteVPNClientsParams) (int64, error)
 
 		GetPlatformSettings(ctx context.Context, key string) ([]byte, error)
-		UpdatePlatformSettings(ctx context.Context, arg postgres.UpdatePlatformSettingsParams) (int64, error)
+		CreatePlatformSettings(ctx context.Context, arg postgres.CreatePlatformSettingsParams) error
+		//UpdatePlatformSettings(ctx context.Context, arg postgres.UpdatePlatformSettingsParams) (int64, error)
 	}
 
 	IPAManager interface {
@@ -435,7 +436,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 	}
 
 	// reserve server address
-	log.Debug().Str("Address: ", s.config.Address).Msg("Reserving server ip")
+	log.Debug().Str("Address", s.config.Address).Msg("Reserving server ip")
 	if _, err = s.ipaManager.AcquireSingleIP(ctx, s.config.Address); err != nil {
 		return appError.ErrPlatform.WithError(err).WithMessage("Failed to reserve vpn server address").Err()
 	}
@@ -447,8 +448,10 @@ func (s *Service) InitServer(ctx context.Context) error {
 		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server key pair from db").Err()
 	}
 
-	if err = json.Unmarshal(keyPairData, s.config.KeyPair); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to unmarshal server key pair data").Err()
+	if err == nil {
+		if err = json.Unmarshal(keyPairData, s.config.KeyPair); err != nil {
+			return appError.ErrPlatform.WithError(err).WithMessage("Failed to unmarshal server key pair data").Err()
+		}
 	}
 
 	// if server private key does not exist generate new key pair
@@ -467,7 +470,7 @@ func (s *Service) InitServer(ctx context.Context) error {
 			return appError.ErrPlatform.WithError(err).WithMessage("Failed to marshal server key pair data").Err()
 		}
 
-		if _, err = s.repository.UpdatePlatformSettings(ctx, postgres.UpdatePlatformSettingsParams{
+		if err = s.repository.CreatePlatformSettings(ctx, postgres.CreatePlatformSettingsParams{
 			Key:   config.VPNKeyPair,
 			Value: keyPairData,
 		}); err != nil {

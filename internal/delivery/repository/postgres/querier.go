@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	CreatePlatformSettings(ctx context.Context, arg CreatePlatformSettingsParams) error
 	CreateVpnClient(ctx context.Context, arg CreateVpnClientParams) error
 	DeleteVPNClients(ctx context.Context, arg DeleteVPNClientsParams) (int64, error)
 	GetPlatformSettings(ctx context.Context, key string) ([]byte, error)
