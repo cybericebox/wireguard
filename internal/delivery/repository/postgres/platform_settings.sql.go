@@ -9,50 +9,34 @@ import (
 	"context"
 )
 
-const getVPNServerPrivateKey = `-- name: GetVPNServerPrivateKey :one
+const getPlatformSettings = `-- name: GetPlatformSettings :one
 select value
 from platform_settings
-where type = 'vpn'
-  and key = 'private_key'
+where key = $1
 `
 
-func (q *Queries) GetVPNServerPrivateKey(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, getVPNServerPrivateKey)
-	var value string
+func (q *Queries) GetPlatformSettings(ctx context.Context, key string) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getPlatformSettings, key)
+	var value []byte
 	err := row.Scan(&value)
 	return value, err
 }
 
-const getVPNServerPublicKey = `-- name: GetVPNServerPublicKey :one
-select value
-from platform_settings
-where type = 'vpn'
-  and key = 'public_key'
+const updatePlatformSettings = `-- name: UpdatePlatformSettings :execrows
+update platform_settings
+set value      = $2,
+key = $1
 `
 
-func (q *Queries) GetVPNServerPublicKey(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, getVPNServerPublicKey)
-	var value string
-	err := row.Scan(&value)
-	return value, err
+type UpdatePlatformSettingsParams struct {
+	Key   string `json:"key"`
+	Value []byte `json:"value"`
 }
 
-const setVPNServerPrivateKey = `-- name: SetVPNServerPrivateKey :exec
-insert into platform_settings (type, key, value)
-values ('vpn', 'private_key', $1)
-`
-
-func (q *Queries) SetVPNServerPrivateKey(ctx context.Context, value string) error {
-	_, err := q.db.Exec(ctx, setVPNServerPrivateKey, value)
-	return err
-}
-
-const setVPNServerPublicKey = `-- name: SetVPNServerPublicKey :exec
-insert into platform_settings (type, key, value)
-values ('vpn', 'public_key', $1)
-`
-
-func (q *Queries) SetVPNServerPublicKey(ctx context.Context, value string) error {
-	_, err := q.db.Exec(ctx, setVPNServerPublicKey, value)
-	return err
+func (q *Queries) UpdatePlatformSettings(ctx context.Context, arg UpdatePlatformSettingsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePlatformSettings, arg.Key, arg.Value)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

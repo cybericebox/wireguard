@@ -1,19 +1,9 @@
--- name: GetVPNServerPublicKey :one
+-- name: GetPlatformSettings :one
 select value
 from platform_settings
-where type = 'vpn'
-  and key = 'public_key';
+where key = $1;
 
--- name: GetVPNServerPrivateKey :one
-select value
-from platform_settings
-where type = 'vpn'
-  and key = 'private_key';
-
--- name: SetVPNServerPublicKey :exec
-insert into platform_settings (type, key, value)
-values ('vpn', 'public_key', $1);
-
--- name: SetVPNServerPrivateKey :exec
-insert into platform_settings (type, key, value)
-values ('vpn', 'private_key', $1);
+-- name: UpdatePlatformSettings :execrows
+update platform_settings
+set value = $2,
+    key   = $1;
