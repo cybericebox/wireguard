@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/cybericebox/lib/pkg/wgKeyGen"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -10,6 +11,7 @@ import (
 
 const (
 	MigrationPath = "migrations"
+	VPNKeyPair    = "vpn-keypair"
 )
 
 type (
@@ -52,12 +54,11 @@ type (
 	}
 
 	VPNConfig struct {
-		Endpoint   string `yaml:"endpoint" env:"VPN_ENDPOINT" env-default:"" env-description:"VPN server endpoint"`
-		CIDR       string `yaml:"cidr" env:"VPN_CIDR" env-default:"10.128.0.0/16" env-description:"VPN clients CIDR"`
-		Address    string
-		Port       string `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN server listen port"`
-		PrivateKey string
-		PublicKey  string
+		Endpoint string `yaml:"endpoint" env:"VPN_ENDPOINT" env-default:"" env-description:"VPN server endpoint"`
+		CIDR     string `yaml:"cidr" env:"VPN_CIDR" env-default:"10.128.0.0/16" env-description:"VPN clients CIDR"`
+		Address  string
+		Port     string `yaml:"port" env:"VPN_PORT" env-default:"51820" env-description:"VPN server listen port"`
+		KeyPair  *wgKeyGen.KeyPair
 	}
 
 	// PostgresConfig is the configuration for the Postgres database

@@ -161,7 +161,7 @@ func (s *Service) generateClientConfig(data *model.Client) (string, error) {
 	data.Endpoint = s.config.Endpoint
 
 	// populate server public key to user config
-	data.PublicKey = s.config.PublicKey
+	data.PublicKey = s.config.KeyPair.PublicKey
 
 	config, err := s.generateConfig(clientConfigTemplate, data)
 	if err != nil {

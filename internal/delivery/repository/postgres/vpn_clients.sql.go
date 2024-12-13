@@ -103,7 +103,7 @@ func (q *Queries) GetVPNClients(ctx context.Context) ([]VpnClient, error) {
 
 const updateVPNClientsBanStatus = `-- name: UpdateVPNClientsBanStatus :execrows
 update vpn_clients
-set banned     = $1,
+set banned = $1,
     updated_at = now()
 where user_id = coalesce($2, user_id)
   and group_id = coalesce($3, group_id)

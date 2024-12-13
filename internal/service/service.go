@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/cybericebox/lib/pkg/ipam"
@@ -39,10 +40,8 @@ type (
 
 		DeleteVPNClients(ctx context.Context, arg postgres.DeleteVPNClientsParams) (int64, error)
 
-		GetVPNServerPrivateKey(ctx context.Context) (string, error)
-		GetVPNServerPublicKey(ctx context.Context) (string, error)
-		SetVPNServerPrivateKey(ctx context.Context, value string) error
-		SetVPNServerPublicKey(ctx context.Context, value string) error
+		GetPlatformSettings(ctx context.Context, key string) ([]byte, error)
+		UpdatePlatformSettings(ctx context.Context, arg postgres.UpdatePlatformSettingsParams) (int64, error)
 	}
 
 	IPAManager interface {
@@ -442,39 +441,39 @@ func (s *Service) InitServer(ctx context.Context) error {
 	}
 
 	// get server private key
-	log.Debug().Msg("Getting server private key from db")
-	s.config.PrivateKey, err = s.repository.GetVPNServerPrivateKey(ctx)
+	log.Debug().Msg("Getting server key pair from db")
+	keyPairData, err := s.repository.GetPlatformSettings(ctx, config.VPNKeyPair)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server private key from db").Err()
+		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server key pair from db").Err()
 	}
 
-	// get server public key
-	log.Debug().Msg("Getting server public key from db")
-	s.config.PublicKey, err = s.repository.GetVPNServerPublicKey(ctx)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server public key from db").Err()
+	if err = json.Unmarshal(keyPairData, s.config.KeyPair); err != nil {
+		return appError.ErrPlatform.WithError(err).WithMessage("Failed to unmarshal server key pair data").Err()
 	}
 
 	// if server private key does not exist generate new key pair
-	if s.config.PrivateKey == "" || s.config.PublicKey == "" {
+	if s.config.KeyPair.PrivateKey == "" || s.config.KeyPair.PublicKey == "" {
 		// generate server key pair
 		log.Debug().Msg("Key pair does not exist, generating new key pair")
-		keys, err := s.keyGenerator.NewKeyPair()
+		s.config.KeyPair, err = s.keyGenerator.NewKeyPair()
 		if err != nil {
 			return appError.ErrPlatform.WithError(err).WithMessage("Failed to generate server key pair").Err()
 		}
 
-		s.config.PrivateKey, s.config.PublicKey = keys.PrivateKey, keys.PublicKey
-
 		// save server key pair
-		log.Debug().Msg("Saving server private key pair to db")
-		if err = s.repository.SetVPNServerPrivateKey(ctx, s.config.PrivateKey); err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server private key to db").Err()
+		log.Debug().Msg("Saving server key pair to db")
+		keyPairData, err = json.Marshal(s.config.KeyPair)
+		if err != nil {
+			return appError.ErrPlatform.WithError(err).WithMessage("Failed to marshal server key pair data").Err()
 		}
-		log.Debug().Msg("Saving server public key pair to db")
-		if err = s.repository.SetVPNServerPublicKey(ctx, s.config.PublicKey); err != nil {
-			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server public key to db").Err()
+
+		if _, err = s.repository.UpdatePlatformSettings(ctx, postgres.UpdatePlatformSettingsParams{
+			Key:   config.VPNKeyPair,
+			Value: keyPairData,
+		}); err != nil {
+			return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to save server key pair to db").Err()
 		}
+
 	}
 
 	log.Debug().Msg("Create server")
