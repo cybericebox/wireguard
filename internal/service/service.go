@@ -447,8 +447,10 @@ func (s *Service) InitServer(ctx context.Context) error {
 		return appError.ErrPlatform.WithWrappedError(appError.ErrPostgres.WithError(err)).WithMessage("Failed to get server key pair from db").Err()
 	}
 
-	if err = json.Unmarshal(keyPairData, s.config.KeyPair); err != nil {
-		return appError.ErrPlatform.WithError(err).WithMessage("Failed to unmarshal server key pair data").Err()
+	if err == nil {
+		if err = json.Unmarshal(keyPairData, s.config.KeyPair); err != nil {
+			return appError.ErrPlatform.WithError(err).WithMessage("Failed to unmarshal server key pair data").Err()
+		}
 	}
 
 	// if server private key does not exist generate new key pair
