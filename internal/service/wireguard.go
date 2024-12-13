@@ -36,7 +36,7 @@ Address = {{.Address}}
 DNS = {{.DNS}}, 1.1.1.1
 
 [Peer]
-PublicKey = {{.KeyPair.PublicKey}}
+PublicKey = {{.PublicKey}}
 AllowedIPs = {{.AllowedIPs}}
 Endpoint = {{.Endpoint}}
 PersistentKeepalive = 25
