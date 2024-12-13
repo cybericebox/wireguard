@@ -23,7 +23,7 @@ const (
 	serverConfigTemplate = `[Interface]
 Address = {{.Address}}
 ListenPort = {{.Port}}
-PrivateKey = {{.PrivateKey}}
+PrivateKey = {{.KeyPair.PrivateKey}}
 SaveConfig = true
 
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT;
@@ -36,7 +36,7 @@ Address = {{.Address}}
 DNS = {{.DNS}}, 1.1.1.1
 
 [Peer]
-PublicKey = {{.PublicKey}}
+PublicKey = {{.KeyPair.PublicKey}}
 AllowedIPs = {{.AllowedIPs}}
 Endpoint = {{.Endpoint}}
 PersistentKeepalive = 25
