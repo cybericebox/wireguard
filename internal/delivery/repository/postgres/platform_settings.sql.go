@@ -9,6 +9,21 @@ import (
 	"context"
 )
 
+const createPlatformSettings = `-- name: CreatePlatformSettings :exec
+insert into platform_settings (key, value)
+values ($1, $2)
+`
+
+type CreatePlatformSettingsParams struct {
+	Key   string `json:"key"`
+	Value []byte `json:"value"`
+}
+
+func (q *Queries) CreatePlatformSettings(ctx context.Context, arg CreatePlatformSettingsParams) error {
+	_, err := q.db.Exec(ctx, createPlatformSettings, arg.Key, arg.Value)
+	return err
+}
+
 const getPlatformSettings = `-- name: GetPlatformSettings :one
 select value
 from platform_settings
@@ -24,8 +39,9 @@ func (q *Queries) GetPlatformSettings(ctx context.Context, key string) ([]byte, 
 
 const updatePlatformSettings = `-- name: UpdatePlatformSettings :execrows
 update platform_settings
-set value      = $2,
-key = $1
+set value = $2,
+    updated_at = now()
+where key = $1
 `
 
 type UpdatePlatformSettingsParams struct {

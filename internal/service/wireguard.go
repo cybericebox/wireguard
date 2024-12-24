@@ -23,7 +23,7 @@ const (
 	serverConfigTemplate = `[Interface]
 Address = {{.Address}}
 ListenPort = {{.Port}}
-PrivateKey = {{.PrivateKey}}
+PrivateKey = {{.KeyPair.PrivateKey}}
 SaveConfig = true
 
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT;
